@@ -9,10 +9,11 @@
     "versions": [
       {
         "version": "3.2.0.0",
-        "changelog": "跟随 Jellyfin 12 / .NET 10 升级：目标框架 net9.0 → net10.0，Jellyfin.Controller / Jellyfin.Model 升级到 12.0.0，targetAbi 12.0.0.0。",
+        "changelog": "### ⬆️ 跟随 Jellyfin 12 / .NET 10 升级\n\n- **目标框架升级**：`net9.0` → `net10.0`，插件需使用 .NET 10 SDK 构建。\n- **Jellyfin 依赖升级**：`Jellyfin.Controller` / `Jellyfin.Model` 由 `10.11.3` 升级到 `12.0.0`，`targetAbi` 更新为 `12.0.0.0`。\n- **兼容性**：本版本起需要 **Jellyfin 12.0+（.NET 10）**；Jellyfin 10.11（.NET 9）请继续使用 3.1.0。\n- **无需改动的部分**：Jellyfin 12 的 `IMediaSourceManager` 接口与 10.11 保持一致，播放拦截、预探测引擎、控制台面板与 API 逻辑均未变动。\n- **CI**：GitHub Actions 的 .NET SDK 更新为 `10.0.x`，产物路径改为 `bin/Release/net10.0/FastSTRM.dll`。\n\n---",
         "targetAbi": "12.0.0.0",
         "sourceUrl": "https://github.com/zian-yan/Jellyfin-FastSTRM/releases/download/v3.2.0/FastSTRM.zip",
-        "timestamp": "2026-10-31T00:00:00Z"
+        "checksum": "96088591d0058b46d70b38ce06a38c12",
+        "timestamp": "2026-10-31T15:01:09Z"
       },
       {
         "version": "3.1.0.0",
