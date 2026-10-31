@@ -1,0 +1,26 @@
+[
+  {
+    "guid": "a1b2c3d4-5678-9abc-def0-123456789abc",
+    "name": "FastSTRM",
+    "description": "消除 .strm 文件播放时的 ffprobe 延迟，实现秒开起播",
+    "overview": "STRM 秒开插件",
+    "owner": "zian-yan",
+    "category": "General",
+    "versions": [
+      {
+        "version": "3.2.0.0",
+        "changelog": "跟随 Jellyfin 12 / .NET 10 升级：目标框架 net9.0 → net10.0，Jellyfin.Controller / Jellyfin.Model 升级到 12.0.0，targetAbi 12.0.0.0。",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/zian-yan/Jellyfin-FastSTRM/releases/download/v3.2.0/FastSTRM.zip",
+        "timestamp": "2026-10-31T00:00:00Z"
+      },
+      {
+        "version": "3.1.0.0",
+        "changelog": "未探测的 .strm 文件默认跳过 ffprobe（allowMediaProbe = false），并提供控制台开关回退官方探测。",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/zian-yan/Jellyfin-FastSTRM/releases/download/v3.1.0/FastSTRM.zip",
+        "timestamp": "2026-10-31T00:00:00Z"
+      }
+    ]
+  }
+]

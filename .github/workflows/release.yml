@@ -124,3 +124,29 @@ jobs:
             FastSTRM.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Plugin Manifest
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -e
+
+          CHECKSUM=$(md5sum FastSTRM.zip | awk '{print $1}')
+          export CHECKSUM
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 切回 main 更新 manifest；工作流只由标签触发，提交回 main 不会造成循环
+          git fetch origin main
+          git checkout -B main origin/main
+
+          python3 scripts/update_manifest.py
+
+          if git diff --quiet -- manifest.json; then
+            echo "manifest.json 无变化"
+          else
+            git add manifest.json
+            git commit -m "chore: update plugin manifest for ${RELEASE_TAG}"
+            git push origin main
+          fi
