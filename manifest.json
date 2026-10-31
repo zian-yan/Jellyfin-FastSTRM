@@ -6,6 +6,7 @@
     "overview": "STRM 秒开插件",
     "owner": "zian-yan",
     "category": "General",
+    "imageUrl": "https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/main/images/faststrm-banner.png",
     "versions": [
       {
         "version": "3.2.0.0",
