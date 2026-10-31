@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases/tag/v3.1.0"><img src="https://img.shields.io/badge/Release-v3.1.0-blue" alt="Release v3.1.0"></a>
-  <a href="https://jellyfin.org/"><img src="https://img.shields.io/badge/Jellyfin-10.11%2B-purple.svg" alt="Jellyfin Version"></a>
-  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-blueviolet.svg" alt=".NET 9.0"></a>
+  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases/tag/v3.2.0"><img src="https://img.shields.io/badge/Release-v3.2.0-blue" alt="Release v3.2.0"></a>
+  <a href="https://jellyfin.org/"><img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple.svg" alt="Jellyfin Version"></a>
+  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-10.0-blueviolet.svg" alt=".NET 10.0"></a>
 </p>
 
 ---
@@ -85,7 +85,7 @@
 
 ### 方式二：从源码编译构建
 
-系统需安装 [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)。
+系统需安装 [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)。
 
 ```bash
 # 1. 克隆代码仓库
@@ -96,7 +96,7 @@ cd Jellyfin-FastSTRM
 dotnet build -c Release
 ```
 
-编译完成后，产物位于 `bin/Release/net9.0/FastSTRM.dll`，将其复制到上述插件目录即可。
+编译完成后，产物位于 `bin/Release/net10.0/FastSTRM.dll`，将其复制到上述插件目录即可。
 
 ---
 
@@ -141,4 +141,4 @@ FastSTRM 提供了标准 RESTful API（需管理员权限 Token 或已登录会�
 - **Zero-Delay Playback**: Intercepts `IMediaSourceManager` to skip remote `ffprobe` network calls; by default this also applies to `.strm` items that were never probed (switchable in the dashboard).
 - **Background Prober**: Full/incremental batch probing and automatic background probing on newly added `.strm` media.
 - **Dashboard UI**: Clean Web management panel in the Jellyfin Dashboard.
-- **Compatibility**: Requires Jellyfin 10.11+ and .NET 9.0.
+- **Compatibility**: Requires Jellyfin 12.0+ and .NET 10.0.
