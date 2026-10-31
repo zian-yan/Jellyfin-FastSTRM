@@ -5,11 +5,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mmyysnd/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/github/v/release/mmyysnd/Jellyfin-FastSTRM?color=blue&label=Release" alt="Latest Release"></a>
+  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases/tag/v3.1.0"><img src="https://img.shields.io/badge/Release-v3.1.0-blue" alt="Release v3.1.0"></a>
   <a href="https://jellyfin.org/"><img src="https://img.shields.io/badge/Jellyfin-10.11%2B-purple.svg" alt="Jellyfin Version"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-blueviolet.svg" alt=".NET 9.0"></a>
-  <a href="https://github.com/mmyysnd/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/github/downloads/mmyysnd/Jellyfin-FastSTRM/total?color=green" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/mmyysnd/Jellyfin-FastSTRM" alt="License"></a>
 </p>
 
 ---
