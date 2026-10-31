@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases/tag/v3.2.0"><img src="https://img.shields.io/badge/Release-v3.2.0-blue" alt="Release v3.2.0"></a>
+  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases/tag/v3.2.1"><img src="https://img.shields.io/badge/Release-v3.2.1-blue" alt="Release v3.2.1"></a>
   <a href="https://jellyfin.org/"><img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple.svg" alt="Jellyfin Version"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-10.0-blueviolet.svg" alt=".NET 10.0"></a>
 </p>
@@ -37,6 +37,7 @@
   - **增量探测 (Incremental)**：快速扫描库内缺少流信息的 STRM 视频，省时省流量；
   - **全量探测 (Full)**：对全库 STRM 媒体深度刷新媒体流元数据与时长。
 - 🤖 **入库自动后台探测**：实时监听媒体库新入库事件，新文件入库自动触发后台探测入库，全程无感。
+- 💾 **观看进度安全**：未探测的 `.strm` 起播后在后台补探测；探测完成前也会正常保存播放位置，不会把条目误标为已观看，第三方客户端的续播点与「继续观看」可正常回传。
 - 📊 **可视化控制台面板**：内置 Jellyfin 管理员后台 UI，直观展示媒体统计、实时进度条及一键启停任务。
 - 🌐 **RESTful API 接口**：支持外部自动化脚本查询状态及启停探测任务。
 
@@ -58,9 +59,12 @@
  ├──▶ 已有流信息 (RunTimeTicks > 0) ──────────▶ allowMediaProbe = false ──▶ 🚀 毫秒级秒开
  │
  ├──▶ 未探测 + 开关开启（默认）──────────────▶ allowMediaProbe = false ──▶ ⚡ 跳过探测直接起播
+ │                                                                       └─▶ 后台补探测 + 保留播放进度
  │
  └──▶ 未探测 + 开关关闭 ─────────────────────▶ allowMediaProbe = true  ──▶ 📡 走原生探测并入库
 ```
+
+> 未探测的 `.strm` 跳过探测并起播后，插件会自动在后台补探测；在时长写入之前，播放位置会被保留而不是被误判为「已看完」，因此第三方客户端的观看进度、续播点和「继续观看」均可正常工作。
 
 ---
 
@@ -117,7 +121,8 @@ dotnet build -c Release
 4. **未探测 STRM 秒开策略**：
    - 默认勾选 **未探测的 STRM 文件也跳过探测**：缺少流信息的 `.strm` 同样不调用 `ffprobe`，点击即播；
    - 关闭该选项后回退官方探测（首次播放较慢，但会把流信息写入数据库）；
-   - 跳过探测的媒体如果缺少时长或轨道信息，可执行 **增量探测** 补全，后续播放即可使用完整的流信息。
+   - **播放进度不会因跳过探测而丢失**：这类条目起播后会在后台自动补探测；在时长写入前，插件会保留客户端上报的播放位置，不会把条目误标为已观看，因此「继续观看」和续播点仍然可用。探测完成后由 Jellyfin 原生规则判定是否看完；
+   - 也可以执行 **增量探测** 提前补全全库时长与轨道信息。
 
 ---
 

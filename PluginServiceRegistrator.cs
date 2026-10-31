@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
@@ -10,7 +11,8 @@ namespace FastSTRM;
 
 /// <summary>
 /// Registers plugin services via Jellyfin's DI pipeline.
-/// Decorates <see cref="IMediaSourceManager"/> with <see cref="MediaSourceInterceptor"/>
+/// Decorates <see cref="IMediaSourceManager"/> with <see cref="MediaSourceInterceptor"/>,
+/// decorates <see cref="IUserDataManager"/> with <see cref="PlaybackStateInterceptor"/>
 /// and registers <see cref="ProbeService"/> as a hosted singleton.
 /// </summary>
 public class PluginServiceRegistrator : IPluginServiceRegistrator
@@ -22,8 +24,33 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ProbeService>();
         serviceCollection.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ProbeService>());
 
-        // Decorate IMediaSourceManager with our interceptor
-        var descriptor = serviceCollection.FirstOrDefault(d => d.ServiceType == typeof(IMediaSourceManager));
+        // Decorate IMediaSourceManager to skip ffprobe for .strm playback.
+        DecorateService<IMediaSourceManager>(
+            serviceCollection,
+            (sp, inner) => new MediaSourceInterceptor(
+                inner,
+                sp.GetRequiredService<ILogger<MediaSourceInterceptor>>(),
+                sp));
+
+        // Decorate IUserDataManager so progress reported for an item that is still being
+        // probed is not thrown away by Jellyfin's "unknown runtime means fully played" rule.
+        DecorateService<IUserDataManager>(
+            serviceCollection,
+            (sp, inner) => new PlaybackStateInterceptor(
+                inner,
+                sp,
+                sp.GetRequiredService<ILogger<PlaybackStateInterceptor>>()));
+    }
+
+    /// <summary>
+    /// Replaces a service registration with a decorator that wraps the original implementation.
+    /// </summary>
+    private static void DecorateService<TService>(
+        IServiceCollection serviceCollection,
+        Func<IServiceProvider, TService, TService> decoratorFactory)
+        where TService : class
+    {
+        var descriptor = serviceCollection.FirstOrDefault(d => d.ServiceType == typeof(TService));
         if (descriptor is null)
         {
             return;
@@ -31,29 +58,30 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 
         serviceCollection.Remove(descriptor);
         serviceCollection.Add(new ServiceDescriptor(
-            typeof(IMediaSourceManager),
-            sp =>
-            {
-                // Resolve the original implementation regardless of registration style
-                IMediaSourceManager inner;
-                if (descriptor.ImplementationInstance is not null)
-                {
-                    inner = (IMediaSourceManager)descriptor.ImplementationInstance;
-                }
-                else if (descriptor.ImplementationFactory is not null)
-                {
-                    inner = (IMediaSourceManager)descriptor.ImplementationFactory(sp);
-                }
-                else
-                {
-                    inner = (IMediaSourceManager)ActivatorUtilities.CreateInstance(
-                        sp, descriptor.ImplementationType!);
-                }
-
-                return new MediaSourceInterceptor(
-                    inner,
-                    sp.GetRequiredService<ILogger<MediaSourceInterceptor>>());
-            },
+            typeof(TService),
+            sp => decoratorFactory(sp, CreateInstance<TService>(sp, descriptor)),
             descriptor.Lifetime));
+    }
+
+    private static TService CreateInstance<TService>(IServiceProvider serviceProvider, ServiceDescriptor descriptor)
+        where TService : class
+    {
+        if (descriptor.ImplementationInstance is TService instance)
+        {
+            return instance;
+        }
+
+        if (descriptor.ImplementationFactory is not null)
+        {
+            return (TService)descriptor.ImplementationFactory(serviceProvider);
+        }
+
+        if (descriptor.ImplementationType is not null)
+        {
+            return (TService)ActivatorUtilities.CreateInstance(serviceProvider, descriptor.ImplementationType);
+        }
+
+        throw new InvalidOperationException(
+            $"The original {typeof(TService).FullName} registration cannot be resolved.");
     }
 }

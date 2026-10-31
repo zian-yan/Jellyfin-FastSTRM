@@ -14,6 +14,7 @@ using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaInfo;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FastSTRM;
@@ -27,6 +28,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
 {
     private readonly IMediaSourceManager _inner;
     private readonly ILogger<MediaSourceInterceptor> _logger;
+    private readonly IServiceProvider _serviceProvider;
 
     /// <summary>
     /// Items for which the "no stream info" warning has already been emitted,
@@ -34,10 +36,14 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
     /// </summary>
     private readonly ConcurrentDictionary<Guid, byte> _warnedItems = new();
 
-    public MediaSourceInterceptor(IMediaSourceManager inner, ILogger<MediaSourceInterceptor> logger)
+    public MediaSourceInterceptor(
+        IMediaSourceManager inner,
+        ILogger<MediaSourceInterceptor> logger,
+        IServiceProvider serviceProvider)
     {
         _inner = inner;
         _logger = logger;
+        _serviceProvider = serviceProvider;
     }
 
     /// <summary>
@@ -86,8 +92,29 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
             item, user, allowMediaProbe: false, enablePathSubstitution, cancellationToken)
             .ConfigureAwait(false);
 
+        if (!hasStreamInfo)
+        {
+            // Playback starts immediately, but a duration is required for Jellyfin to save
+            // resume points and to decide when an item has been watched to completion.
+            // Schedule the probe after the playback sources are built so the response and the
+            // background refresh never touch the item at the same time.
+            ScheduleBackgroundProbe(item);
+        }
+
         WarnIfStreamInfoMissing(item, hasStreamInfo, sources);
         return sources;
+    }
+
+    private void ScheduleBackgroundProbe(BaseItem item)
+    {
+        try
+        {
+            _serviceProvider.GetService<ProbeService>()?.SchedulePlaybackProbe(item);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "FastSTRM: Unable to schedule a background probe for {Name}", item.Name);
+        }
     }
 
     private static bool IsStrmItem(BaseItem item)
@@ -119,8 +146,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
 
         _logger.LogWarning(
             "FastSTRM: {Name} has no stream info and probing was skipped for instant playback. "
-            + "Duration and track information stay unavailable until the background probe completes; "
-            + "run the Incremental probe to fill them in.",
+            + "Playback progress is kept; a background probe fills in the duration/track information.",
             item.Name);
     }
 

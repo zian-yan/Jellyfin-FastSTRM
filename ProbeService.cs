@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -26,6 +27,19 @@ public sealed class ProbeService : IHostedService, IDisposable
     private CancellationTokenSource? _cts;
     private Task? _probeTask;
     private readonly object _lock = new();
+
+    /// <summary>
+    /// Items whose background playback probe is currently running, so one item is never probed twice at once.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, byte> _playbackProbeInFlight = new();
+
+    /// <summary>
+    /// Last time a background playback probe was attempted per item. Prevents a failing remote
+    /// source from being re-probed on every playback progress report.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, DateTime> _lastPlaybackProbeAttemptUtc = new();
+
+    private static readonly TimeSpan PlaybackProbeRetryInterval = TimeSpan.FromMinutes(10);
 
     /// <summary>Gets the current task state: Idle, Running, or Stopping.</summary>
     public string State { get; private set; } = "Idle";
@@ -150,6 +164,66 @@ public sealed class ProbeService : IHostedService, IDisposable
                 _cts.Cancel();
             }
         }
+    }
+
+    /// <summary>
+    /// Schedules a background probe for an unprobed .strm item that is being played.
+    /// Playback itself is never blocked: the duration is filled in shortly after playback
+    /// starts so resume points and completion can be tracked with real metadata.
+    /// </summary>
+    /// <param name="item">The item that is being played.</param>
+    public void SchedulePlaybackProbe(BaseItem item)
+    {
+        if (!IsStrmItem(item) || HasStreamInfo(item))
+        {
+            return;
+        }
+
+        // A running batch probe already covers unprobed items; do not probe the same
+        // item concurrently with it.
+        if (State != "Idle")
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (_lastPlaybackProbeAttemptUtc.TryGetValue(item.Id, out var lastAttempt)
+            && now - lastAttempt < PlaybackProbeRetryInterval)
+        {
+            return;
+        }
+
+        if (!_playbackProbeInFlight.TryAdd(item.Id, 0))
+        {
+            return;
+        }
+
+        _lastPlaybackProbeAttemptUtc[item.Id] = now;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                _logger.LogInformation(
+                    "FastSTRM: Playback started before {Name} was probed, filling in duration in the background so playback progress can be tracked",
+                    item.Name);
+
+                await ProbeItemAsync(item, CancellationToken.None).ConfigureAwait(false);
+
+                _logger.LogInformation(
+                    "FastSTRM: Background probe of {Name} finished (RunTimeTicks={RunTimeTicks})",
+                    item.Name,
+                    item.RunTimeTicks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "FastSTRM: Background playback probe failed for {Name}", item.Name);
+            }
+            finally
+            {
+                _playbackProbeInFlight.TryRemove(item.Id, out _);
+            }
+        });
     }
 
     // ── Internal ──
