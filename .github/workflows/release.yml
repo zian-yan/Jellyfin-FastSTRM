@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name (e.g. v3.0.0)'
+        description: 'Tag name to release (e.g. v3.1.0)'
         required: true
-        default: 'v3.0.0'
+        default: 'v3.1.0'
 
 permissions:
   contents: write
@@ -29,45 +29,86 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: Resolve and Verify Version
+        id: version
+        run: |
+          set -e
+
+          RAW_TAG="${{ github.event.inputs.tag_name || github.ref_name }}"
+          CLEAN_VER="${RAW_TAG#v}"
+          echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "clean=${CLEAN_VER}" >> "$GITHUB_OUTPUT"
+
+          normalize() { echo "$1" | sed -E 's/\.0$//'; }
+
+          CSPROJ_VER=$(grep -oP '(?<=<Version>)[^<]+' FastSTRM.csproj | head -n1)
+          META_VER=$(grep -oP '(?<="version": ")[^"]+' meta.json | head -n1)
+          BUILD_VER=$(grep -oP '(?<=^version: ")[^"]+' build.yaml | head -n1)
+
+          echo "tag=${RAW_TAG} clean=${CLEAN_VER} csproj=${CSPROJ_VER} meta=${META_VER} build=${BUILD_VER}"
+
+          for pair in "FastSTRM.csproj:${CSPROJ_VER}" "meta.json:${META_VER}" "build.yaml:${BUILD_VER}"; do
+            file="${pair%%:*}"
+            value="${pair#*:}"
+            if [ "$(normalize "$value")" != "$CLEAN_VER" ]; then
+              echo "::error::版本不一致：${file} 是 ${value}，但 tag 是 ${RAW_TAG}（期望 ${CLEAN_VER}）"
+              exit 1
+            fi
+          done
+
       - name: Build Release DLL
-        run: dotnet build -c Release
+        run: dotnet build FastSTRM.csproj -c Release --nologo
 
       - name: Prepare Release Assets
         run: |
+          set -e
+
+          if [ ! -f bin/Release/net9.0/FastSTRM.dll ]; then
+            echo "::error::构建产物 bin/Release/net9.0/FastSTRM.dll 不存在"
+            exit 1
+          fi
+
           mkdir -p release-pkg
           cp bin/Release/net9.0/FastSTRM.dll release-pkg/
-          cp README.md release-pkg/
-          cp CHANGELOG.md release-pkg/
-          cp meta.json release-pkg/
-          cp build.yaml release-pkg/
+          cp README.md CHANGELOG.md meta.json build.yaml release-pkg/
           zip -j FastSTRM.zip release-pkg/*
           cp bin/Release/net9.0/FastSTRM.dll ./FastSTRM.dll
 
+          ls -lh FastSTRM.dll FastSTRM.zip
+
       - name: Extract Release Notes
-        id: notes
+        env:
+          RAW_TAG: ${{ steps.version.outputs.tag }}
+          CLEAN_VER: ${{ steps.version.outputs.clean }}
         run: |
-          # Extract release notes for current tag from CHANGELOG.md
-          VERSION="${{ github.event.inputs.tag_name || github.ref_name }}"
-          CLEAN_VER="${VERSION#v}"
-          
-          if grep -q "## \[$CLEAN_VER\]" CHANGELOG.md; then
+          set -e
+
+          # 精确匹配 "## [x.y.z]" 标题，避免 [] 被当成正则字符组
+          if grep -qF "## [$CLEAN_VER]" CHANGELOG.md; then
             awk -v ver="## [$CLEAN_VER]" '
-              $0 ~ ver { flag=1; next }
-              flag && /^## \[/ { flag=0 }
+              index($0, ver) == 1 { flag = 1; next }
+              flag && /^## \[/ { flag = 0 }
               flag { print }
             ' CHANGELOG.md > RELEASE_NOTES.md
-          else
-            cp CHANGELOG.md RELEASE_NOTES.md
           fi
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::warning::CHANGELOG.md 中没有找到 ${CLEAN_VER} 段落，使用默认说明"
+            printf 'Jellyfin-FastSTRM %s\n' "$RAW_TAG" > RELEASE_NOTES.md
+          fi
+
+          echo "----- RELEASE_NOTES.md -----"
+          cat RELEASE_NOTES.md
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
-          name: Jellyfin-FastSTRM ${{ github.event.inputs.tag_name || github.ref_name }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Jellyfin-FastSTRM ${{ steps.version.outputs.tag }}
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
+          fail_on_unmatched_files: true
           files: |
             FastSTRM.dll
             FastSTRM.zip
