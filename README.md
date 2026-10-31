@@ -1,4 +1,4 @@
-# Jellyfin-FastSTRM
+<h1 align="center">Jellyfin-FastSTRM</h1>
 
 <p align="center">
   <strong>⚡ 专为 Jellyfin 打造的 .strm 媒体秒开加速插件 | Instant Playback Plugin for Jellyfin STRM Streams</strong>
