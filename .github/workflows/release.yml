@@ -35,23 +35,33 @@ jobs:
           set -e
 
           RAW_TAG="${{ github.event.inputs.tag_name || github.ref_name }}"
-          CLEAN_VER="${RAW_TAG#v}"
+
+          # 只去掉第四段版本号：3.1.0.0 -> 3.1.0，3.1.0 保持不变
+          normalize() {
+            if [[ "$1" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+$ ]]; then
+              echo "${BASH_REMATCH[1]}"
+            else
+              echo "$1"
+            fi
+          }
+
+          CLEAN_VER=$(normalize "${RAW_TAG#v}")
           echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
           echo "clean=${CLEAN_VER}" >> "$GITHUB_OUTPUT"
-
-          normalize() { echo "$1" | sed -E 's/\.0$//'; }
 
           CSPROJ_VER=$(grep -oP '(?<=<Version>)[^<]+' FastSTRM.csproj | head -n1)
           META_VER=$(grep -oP '(?<="version": ")[^"]+' meta.json | head -n1)
           BUILD_VER=$(grep -oP '(?<=^version: ")[^"]+' build.yaml | head -n1)
 
           echo "tag=${RAW_TAG} clean=${CLEAN_VER} csproj=${CSPROJ_VER} meta=${META_VER} build=${BUILD_VER}"
+          echo "normalized: csproj=$(normalize "${CSPROJ_VER}") meta=$(normalize "${META_VER}") build=$(normalize "${BUILD_VER}")"
 
           for pair in "FastSTRM.csproj:${CSPROJ_VER}" "meta.json:${META_VER}" "build.yaml:${BUILD_VER}"; do
             file="${pair%%:*}"
             value="${pair#*:}"
-            if [ "$(normalize "$value")" != "$CLEAN_VER" ]; then
-              echo "::error::版本不一致：${file} 是 ${value}，但 tag 是 ${RAW_TAG}（期望 ${CLEAN_VER}）"
+            norm_val=$(normalize "$value")
+            if [ "$norm_val" != "$CLEAN_VER" ]; then
+              echo "::error::版本不一致：${file} 是 ${value}（归一化 ${norm_val}），tag 是 ${RAW_TAG}（期望 ${CLEAN_VER}）"
               exit 1
             fi
           done
