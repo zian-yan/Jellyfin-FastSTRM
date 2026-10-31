@@ -153,8 +153,6 @@ FastSTRM 提供了标准 RESTful API（需管理员权限 Token 或已登录会�
 https://cdn.jsdelivr.net/gh/zian-yan/Jellyfin-FastSTRM@main/manifest.json
 ```
 
-> 每次推送 `v*` 标签发布新版本时，Release 工作流会自动把版本号、更新日志以及 ZIP 的 MD5 写入 `manifest.json` 并提交回 `main`，无需手工维护。清单中同时保留 3.1.0（Jellyfin 10.11 / .NET 9）与 3.2.0（Jellyfin 12 / .NET 10），Jellyfin 会按 `targetAbi` 自动选择兼容版本。
-
 ---
 
 ## 🌐 English Overview
