@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/main/images/faststrm-banner.png",
     "versions": [
       {
+        "version": "3.2.2.0",
+        "changelog": "### 💬 优化\n\n- 精简控制台「未探测的 STRM 文件也跳过探测」的说明文字。\n\n---",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/zian-yan/Jellyfin-FastSTRM/releases/download/v3.2.2/FastSTRM.zip",
+        "checksum": "c8a260fecd2c65140868fc155bacc470",
+        "timestamp": "2026-11-01T01:52:32Z"
+      },
+      {
         "version": "3.2.1.0",
         "changelog": "### 🐛 修复\n\n- 修复未探测 `.strm` 播放进度丢失、退出时被误标为已观看的问题。\n- 起播后自动在后台补探测时长与流信息，探测期间进度仍正常保存。",
         "targetAbi": "12.0.0.0",
