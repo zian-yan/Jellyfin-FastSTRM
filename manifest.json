@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/main/images/faststrm-banner.png",
     "versions": [
       {
+        "version": "3.2.3.0",
+        "changelog": "### 🐛 修复\n\n- 后台探测以 `RunTimeTicks` 是否写入判定成败，失败不再打印 `finished`。\n- 起播 10 秒后再探测，失败按 `10s → 30s` 重试，最多 3 次。\n- 批量预探测运行时不再叠加单集重试。\n\n---",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/zian-yan/Jellyfin-FastSTRM/releases/download/v3.2.3/FastSTRM.zip",
+        "checksum": "77acf22366de454726b7597b2e9220e4",
+        "timestamp": "2026-11-01T11:11:36Z"
+      },
+      {
         "version": "3.2.2.0",
         "changelog": "### 💬 优化\n\n- 精简控制台「未探测的 STRM 文件也跳过探测」的说明文字。\n\n---",
         "targetAbi": "12.0.0.0",
