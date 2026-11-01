@@ -80,7 +80,7 @@
                     </label>
                 </div>
                 <div class="fieldDescription" style="margin-top: -0.4em; margin-bottom: 1em;">
-                    开启（推荐）：缺少流信息的 .strm 同样跳过 ffprobe，点击即播；关闭：回退官方媒体探测并写入数据库。跳过探测的条目起播后会由插件在后台补探测，期间播放进度仍会正常保留，不会被误标为已观看；缺失的时长/轨道信息也可通过「增量探测」提前补全。
+                    开启：未探测的 .strm 跳过 ffprobe，点击即播；关闭：回退官方探测。跳过探测时后台会补探测，播放进度不受影响。
                 </div>
                 <div>
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">
