@@ -3,7 +3,7 @@
 为 Jellyfin 打造的 `.strm` 媒体秒开插件：跳过远程 `ffprobe` 探测，点击即播。
 
 <p>
-  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.2.2-blue" alt="Release"></a>
+  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.2.3-blue" alt="Release"></a>
   <img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple" alt="Jellyfin 12.0+">
   <img src="https://img.shields.io/badge/.NET-10.0-blueviolet" alt=".NET 10.0">
 </p>
@@ -27,21 +27,14 @@ FastSTRM 注入 `IMediaSourceManager` 装饰器，让 `.strm` 媒体跳过远程
 ## 工作原理
 
 ```text
-[ 用户发起播放请求 ]
-         │
-         ▼
-[ MediaSourceInterceptor (装饰器拦截) ]
-         │
-  ┌──────┴──────────────────────────────────────┐
-  ▼ 非 .strm 本地文件                            ▼ .strm 文件
-  100% 透传原生管线                              检查 RunTimeTicks 与配置开关
-                                                 │
-  ├──▶ 已有流信息 (RunTimeTicks > 0) ───────────▶ allowMediaProbe = false ──▶ 🚀 秒开
-  │
-  ├──▶ 未探测 + 开关开启（默认）────────────────▶ allowMediaProbe = false ──▶ ⚡ 直接起播
-  │                                                                         └─▶ 后台补探测 + 保留进度
-  │
-  └──▶ 未探测 + 开关关闭 ──────────────────────▶ allowMediaProbe = true  ──▶ 📡 走原生探测并入库
+[ 播放请求 ] ──▶ [ MediaSourceInterceptor ]
+                      │
+                      ├── 非 .strm ──────────▶ 100% 透传原生管线
+                      │
+                      └── .strm
+                          ├── 已有流信息 ────▶ allowMediaProbe = false ──▶ 🚀 秒开播放
+                          ├── 未探测 + 开关开启 ▶ allowMediaProbe = false ──▶ ⚡ 直接起播 + 后台补探测
+                          └── 未探测 + 开关关闭 ▶ 沿用调用方参数 ─────────▶ 📡 原生探测
 ```
 
 ## 安装
