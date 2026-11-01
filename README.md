@@ -1,8 +1,8 @@
-# Jellyfin-FastSTRM
+<h1 align="center">Jellyfin-FastSTRM</h1>
 
-为 Jellyfin 打造的 `.strm` 媒体秒开插件：跳过远程 `ffprobe` 探测，点击即播。
+<p align="center">为 Jellyfin 打造的 <code>.strm</code> 媒体秒开插件：跳过远程 <code>ffprobe</code> 探测，点击即播。</p>
 
-<p>
+<p align="center">
   <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.2.3-blue" alt="Release"></a>
   <img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple" alt="Jellyfin 12.0+">
   <img src="https://img.shields.io/badge/.NET-10.0-blueviolet" alt=".NET 10.0">
@@ -12,7 +12,7 @@
 
 ## 简介
 
-FastSTRM 注入 `IMediaSourceManager` 装饰器，让 `.strm` 媒体跳过远程网络探测，消除 AList / OpenList / WebDAV / CloudDrive2 / Rclone 等挂载源起播时 3~15 秒的等待与探测超时，实现毫秒级秒开，Web、TV、手机及第三方客户端均生效。
+FastSTRM 注入 `IMediaSourceManager` 装饰器，让 `.strm` 媒体跳过远程网络探测，消除起播时 3~15 秒的等待与探测超时，实现毫秒级秒开，Web、TV、手机及第三方客户端均生效。
 
 ## 特性
 
@@ -76,12 +76,12 @@ dotnet build -c Release
 
 需管理员权限 Token 或已登录会话。
 
-| 方法 | 路径 | 说明 |
-| :--- | :--- | :--- |
-| `GET` | `/FastStrm/Summary` | 统计概览与秒开开关状态 |
+| 方法     | 路径                                       | 说明                           |
+| :----- | :--------------------------------------- | :--------------------------- |
+| `GET`  | `/FastStrm/Summary`                      | 统计概览与秒开开关状态                  |
 | `POST` | `/FastStrm/Probe/Start?mode=Incremental` | 启动探测（`Incremental` / `Full`） |
-| `POST` | `/FastStrm/Probe/Stop` | 停止探测 |
-| `GET` | `/FastStrm/Probe/Status` | 任务状态、进度与当前文件 |
+| `POST` | `/FastStrm/Probe/Stop`                   | 停止探测                         |
+| `GET`  | `/FastStrm/Probe/Status`                 | 任务状态、进度与当前文件                 |
 
 ## 插件仓库（自动更新）
 
