@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.2.2] - 2026-11-01
+
+### 💬 优化
+
+- 精简控制台「未探测的 STRM 文件也跳过探测」的说明文字。
+
+---
+
 ## [3.2.1] - 2026-11-01
 
 ### 🐛 修复

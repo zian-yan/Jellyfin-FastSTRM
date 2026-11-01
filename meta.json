@@ -3,7 +3,7 @@
   "name": "FastSTRM",
   "description": "消除 .strm 文件播放时的 ffprobe 延迟，实现秒开起播",
   "overview": "STRM 秒开插件",
-  "version": "3.2.1.0",
+  "version": "3.2.2.0",
   "targetAbi": "12.0.0.0",
   "owner": "FastSTRM",
   "category": "General",

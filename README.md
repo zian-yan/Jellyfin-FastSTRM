@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases/tag/v3.2.1"><img src="https://img.shields.io/badge/Release-v3.2.1-blue" alt="Release v3.2.1"></a>
+  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases/tag/v3.2.2"><img src="https://img.shields.io/badge/Release-v3.2.2-blue" alt="Release v3.2.2"></a>
   <a href="https://jellyfin.org/"><img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple.svg" alt="Jellyfin Version"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-10.0-blueviolet.svg" alt=".NET 10.0"></a>
 </p>
