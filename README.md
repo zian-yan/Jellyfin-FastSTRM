@@ -1,49 +1,30 @@
-<h1 align="center">Jellyfin-FastSTRM</h1>
+# Jellyfin-FastSTRM
 
-<p align="center">
-  <strong>⚡ 专为 Jellyfin 打造的 .strm 媒体秒开加速插件 | Instant Playback Plugin for Jellyfin STRM Streams</strong>
+为 Jellyfin 打造的 `.strm` 媒体秒开插件：跳过远程 `ffprobe` 探测，点击即播。
+
+<p>
+  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.2.2-blue" alt="Release"></a>
+  <img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple" alt="Jellyfin 12.0+">
+  <img src="https://img.shields.io/badge/.NET-10.0-blueviolet" alt=".NET 10.0">
 </p>
 
-<p align="center">
-  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases/tag/v3.2.2"><img src="https://img.shields.io/badge/Release-v3.2.2-blue" alt="Release v3.2.2"></a>
-  <a href="https://jellyfin.org/"><img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple.svg" alt="Jellyfin Version"></a>
-  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-10.0-blueviolet.svg" alt=".NET 10.0"></a>
-</p>
-
 ---
 
-## 📖 项目简介 (Introduction)
+## 简介
 
-**FastSTRM** 是一个专为 **Jellyfin** 媒体服务器设计的 `.strm` 文件播放加速插件。
+FastSTRM 注入 `IMediaSourceManager` 装饰器，让 `.strm` 媒体跳过远程网络探测，消除 AList / OpenList / WebDAV / CloudDrive2 / Rclone 等挂载源起播时 3~15 秒的等待与探测超时，实现毫秒级秒开，Web、TV、手机及第三方客户端均生效。
 
-通过在 Jellyfin 底层注入 `IMediaSourceManager` 拦截装饰器，配合**全库预探测**与**入库自动探测**机制，彻底消除播放直链或网盘 STRM 媒体时由 `ffprobe` 远程网络探测引起的漫长等待，实现**毫秒级秒开起播**。
+## 特性
 
-### 🎯 适用场景与解决的痛点
-- **AList / OpenList / WebDAV 挂载**：解决 115网盘、阿里云盘、夸克网盘、天翼云、OneDrive 等挂载 STRM 播放转圈问题。
-- **CloudDrive2 (CD2) / Rclone 挂载**：消除远程挂载直链每次起播耗时 3~15 秒的 `ffprobe` 网络探测。
-- **避免探测超时与播放失败**：防止因远程网盘直链限速或响应慢导致的播放超时报错。
-- **多端秒开**：无论 Web 网页端、电视 TV 端（Android TV / Apple TV）、手机端还是第三方客户端，均可享受秒开体验。
+- **毫秒级起播**：`.strm` 跳过网络 probe，直接起播。
+- **安全分流**：非 `.strm` 本地文件 100% 透传，零副作用。
+- **全库预探测**：增量探测（仅补缺少流信息的条目）与全量探测。
+- **入库自动探测**：监听媒体库新增事件，新 STRM 后台自动补探测。
+- **进度不丢失**：起播后后台补探测，时长写入前保留播放位置，不会误标已观看，「继续观看」与续播正常。
+- **控制台面板**：媒体统计、实时进度、一键启停。
+- **REST API**：支持脚本查询状态、启停任务。
 
----
-
-## ✨ 核心特性 (Key Features)
-
-- ⚡ **毫秒级极速起播**：直接拦截播放源解析管线，`.strm` 媒体跳过远程网络 probe，点击即播。
-- 🛡️ **安全路由分流**：
-  - **非 `.strm` 本地文件**：100% 原始透传，零副作用；
-  - **已有流信息的 `.strm` 文件**：直接跳过探测（`allowMediaProbe = false`），秒开直连；
-  - **未探测的 `.strm` 文件**：默认同样跳过探测（`allowMediaProbe = false`），首次点击即刻起播；如需官方探测兜底，可在控制台关闭「未探测的 STRM 文件也跳过探测」开关。
-- 🔍 **全库预探测引擎 (Probe Engine)**：
-  - **增量探测 (Incremental)**：快速扫描库内缺少流信息的 STRM 视频，省时省流量；
-  - **全量探测 (Full)**：对全库 STRM 媒体深度刷新媒体流元数据与时长。
-- 🤖 **入库自动后台探测**：实时监听媒体库新入库事件，新文件入库自动触发后台探测入库，全程无感。
-- 💾 **观看进度安全**：未探测的 `.strm` 起播后在后台补探测；探测完成前也会正常保存播放位置，不会把条目误标为已观看，第三方客户端的续播点与「继续观看」可正常回传。
-- 📊 **可视化控制台面板**：内置 Jellyfin 管理员后台 UI，直观展示媒体统计、实时进度条及一键启停任务。
-- 🌐 **RESTful API 接口**：支持外部自动化脚本查询状态及启停探测任务。
-
----
-
-## 🛠️ 工作原理 (How It Works)
+## 工作原理
 
 ```text
 [ 用户发起播放请求 ]
@@ -51,120 +32,81 @@
          ▼
 [ MediaSourceInterceptor (装饰器拦截) ]
          │
- ┌───────┴─────────────────────────────────────┐
- │                                             │
- ▼ 非 .strm 本地文件                           ▼ .strm 文件
- 100% 透传原生管线                             检查 RunTimeTicks 与配置开关
-                                               │
- ├──▶ 已有流信息 (RunTimeTicks > 0) ──────────▶ allowMediaProbe = false ──▶ 🚀 毫秒级秒开
- │
- ├──▶ 未探测 + 开关开启（默认）──────────────▶ allowMediaProbe = false ──▶ ⚡ 跳过探测直接起播
- │                                                                       └─▶ 后台补探测 + 保留播放进度
- │
- └──▶ 未探测 + 开关关闭 ─────────────────────▶ allowMediaProbe = true  ──▶ 📡 走原生探测并入库
+  ┌──────┴──────────────────────────────────────┐
+  ▼ 非 .strm 本地文件                            ▼ .strm 文件
+  100% 透传原生管线                              检查 RunTimeTicks 与配置开关
+                                                 │
+  ├──▶ 已有流信息 (RunTimeTicks > 0) ───────────▶ allowMediaProbe = false ──▶ 🚀 秒开
+  │
+  ├──▶ 未探测 + 开关开启（默认）────────────────▶ allowMediaProbe = false ──▶ ⚡ 直接起播
+  │                                                                         └─▶ 后台补探测 + 保留进度
+  │
+  └──▶ 未探测 + 开关关闭 ──────────────────────▶ allowMediaProbe = true  ──▶ 📡 走原生探测并入库
 ```
 
-> 未探测的 `.strm` 跳过探测并起播后，插件会自动在后台补探测；在时长写入之前，播放位置会被保留而不是被误判为「已看完」，因此第三方客户端的观看进度、续播点和「继续观看」均可正常工作。
+## 安装
 
----
+**方式一：下载 Release**
 
-## 📦 安装与部署 (Installation)
+1. 下载 [最新版本](https://github.com/zian-yan/Jellyfin-FastSTRM/releases) 的 `FastSTRM.dll`。
+2. 放入 Jellyfin 插件目录下的 `FastSTRM` 文件夹：
 
-### 方式一：直接下载 Release 安装（推荐）
-
-1. 前往 [Releases 页面](https://github.com/mmyysnd/Jellyfin-FastSTRM/releases) 下载最新的 `FastSTRM.dll` 或 `FastSTRM.zip`。
-2. 在 Jellyfin 插件目录中新建 `FastSTRM` 文件夹，并将 `FastSTRM.dll` 放入其中：
-
-| 运行环境 | 常见插件路径 (Plugin Path) |
+| 运行环境 | 插件路径 |
 | :--- | :--- |
-| **Docker (官方 / LSIO / 各种 NAS)** | `<配置映射路径>/plugins/FastSTRM/FastSTRM.dll` 或 `/config/plugins/FastSTRM/FastSTRM.dll` |
-| **Linux (Debian/Ubuntu/CentOS)** | `/var/lib/jellyfin/plugins/FastSTRM/FastSTRM.dll` |
-| **Windows 服务版 (默认安装)** | `C:\ProgramData\Jellyfin\Server\plugins\FastSTRM\FastSTRM.dll` |
-| **Windows 便携版 / 用户模式** | `%LOCALAPPDATA%\jellyfin\plugins\FastSTRM\FastSTRM.dll` |
+| Docker / NAS | `/config/plugins/FastSTRM/FastSTRM.dll` |
+| Linux | `/var/lib/jellyfin/plugins/FastSTRM/FastSTRM.dll` |
+| Windows 服务版 | `C:\ProgramData\Jellyfin\Server\plugins\FastSTRM\FastSTRM.dll` |
+| Windows 便携版 | `%LOCALAPPDATA%\jellyfin\plugins\FastSTRM\FastSTRM.dll` |
 
-3. **重启 Jellyfin 服务**。
-4. 登录 Jellyfin 管理员账号，进入 **控制台 -> 插件**，即可看到 **FastSTRM** 已激活。
+3. 重启 Jellyfin，在 **控制台 → 插件** 中确认 FastSTRM 已启用。
 
----
-
-### 方式二：从源码编译构建
-
-系统需安装 [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)。
+**方式二：源码编译**（需 [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)）
 
 ```bash
-# 1. 克隆代码仓库
-git clone https://github.com/mmyysnd/Jellyfin-FastSTRM.git
+git clone https://github.com/zian-yan/Jellyfin-FastSTRM.git
 cd Jellyfin-FastSTRM
-
-# 2. 编译发布版本
 dotnet build -c Release
 ```
 
-编译完成后，产物位于 `bin/Release/net10.0/FastSTRM.dll`，将其复制到上述插件目录即可。
+将 `bin/Release/net10.0/FastSTRM.dll` 复制到上述插件目录。
 
----
+## 使用
 
-## 🖥️ 控制台使用指南 (Usage Guide)
+在 **控制台 → 插件 → FastSTRM** 中：
 
-进入 Jellyfin 管理控制台，在左侧导航栏的 **插件** 列表中点击 **FastSTRM**：
+- **统计仪表盘**：查看 STRM 总数、已有流信息与缺少流信息的数量。
+- **执行预探测**：选择增量（推荐）或全量，点击 **启动预探测**，可查看进度并随时停止。
+- **入库自动探测**：勾选 **Strm入库自动探测** 并保存。
+- **未探测 STRM 秒开策略**：默认勾选 **未探测的 STRM 文件也跳过探测**，点击即播并在后台补探测；关闭则回退官方探测（首次播放较慢，但会写入流信息）。
 
-1. **媒体库统计仪表盘**：
-   - `.strm 媒体数量`：当前媒体库中全部 STRM 视频总数。
-   - `已有流信息`：已完成探测、支持毫秒级秒开的视频数。
-   - `缺少流信息`：尚未获取流信息的视频数。
-2. **执行预探测**：
-   - **增量探测**（推荐）：仅探测“缺少流信息”的视频，速度极快。
-   - **全量探测**：扫描全库所有 STRM 视频并刷新流信息。
-   - 点击 **启动预探测** 后可实时查看进度百分比与当前处理文件名，可随时点击 **停止**。
-3. **Strm 入库自动探测**：
-   - 勾选 **Strm入库自动探测** 并点击 **保存**。当媒体库扫描到新加入的 STRM 文件时，插件将在后台自动完成探测，无需手动操作。
-4. **未探测 STRM 秒开策略**：
-   - 默认勾选 **未探测的 STRM 文件也跳过探测**：缺少流信息的 `.strm` 同样不调用 `ffprobe`，点击即播；
-   - 关闭该选项后回退官方探测（首次播放较慢，但会把流信息写入数据库）；
-   - **播放进度不会因跳过探测而丢失**：这类条目起播后会在后台自动补探测；在时长写入前，插件会保留客户端上报的播放位置，不会把条目误标为已观看，因此「继续观看」和续播点仍然可用。探测完成后由 Jellyfin 原生规则判定是否看完；
-   - 也可以执行 **增量探测** 提前补全全库时长与轨道信息。
+## API
 
----
+需管理员权限 Token 或已登录会话。
 
-## 🔌 API 接口 (REST API Reference)
-
-FastSTRM 提供了标准 RESTful API（需管理员权限 Token 或已登录会话）：
-
-| 请求方式 | 路径 | 描述 |
+| 方法 | 路径 | 说明 |
 | :--- | :--- | :--- |
-| `GET` | `/FastStrm/Summary` | 获取媒体库 STRM 统计概览（总数/已探测/未探测）及未探测秒开开关状态 |
-| `POST` | `/FastStrm/Probe/Start?mode=Incremental` | 启动预探测任务（参数 `Incremental` 或 `Full`） |
-| `POST` | `/FastStrm/Probe/Stop` | 停止当前正在运行的预探测任务 |
-| `GET` | `/FastStrm/Probe/Status` | 查询当前预探测任务状态、进度及当前处理文件名 |
+| `GET` | `/FastStrm/Summary` | 统计概览与秒开开关状态 |
+| `POST` | `/FastStrm/Probe/Start?mode=Incremental` | 启动探测（`Incremental` / `Full`） |
+| `POST` | `/FastStrm/Probe/Stop` | 停止探测 |
+| `GET` | `/FastStrm/Probe/Status` | 任务状态、进度与当前文件 |
 
----
+## 插件仓库（自动更新）
 
-## 🔄 插件仓库（自动更新）
-
-仓库根目录的 [manifest.json](manifest.json) 可以直接作为 Jellyfin 的自定义插件源，添加后即可在「控制台 → 插件 → 目录」中检查更新、一键升级：
-
-1. 打开 **控制台 → 插件 → 目录（Repositories）**，点击 **添加**；
+1. 打开 **控制台 → 插件 → 目录**，点击 **添加**；
 2. 名称填 `FastSTRM`，地址填：
 
    ```text
    https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/main/manifest.json
    ```
 
-3. 保存后进入「插件 → 目录」，搜索 `FastSTRM` 安装即可。
+3. 保存后在「插件 → 目录」搜索 `FastSTRM` 安装。
 
-如果 `raw.githubusercontent.com` 访问不稳定，可改用 jsDelivr 镜像（分支缓存约 12 小时）：
+若 `raw.githubusercontent.com` 访问不稳定，可改用 jsDelivr 镜像（缓存约 12 小时）：
 
 ```text
 https://cdn.jsdelivr.net/gh/zian-yan/Jellyfin-FastSTRM@main/manifest.json
 ```
 
----
+## English
 
-## 🌐 English Overview
-
-**FastSTRM** is a high-performance Jellyfin plugin designed to eliminate playback start delay for `.strm` files (such as AList, WebDAV, CloudDrive, or remote cloud storage streams).
-
-- **Zero-Delay Playback**: Intercepts `IMediaSourceManager` to skip remote `ffprobe` network calls; by default this also applies to `.strm` items that were never probed (switchable in the dashboard).
-- **Background Prober**: Full/incremental batch probing and automatic background probing on newly added `.strm` media.
-- **Dashboard UI**: Clean Web management panel in the Jellyfin Dashboard.
-- **Compatibility**: Requires Jellyfin 12.0+ and .NET 10.0.
+**FastSTRM** eliminates playback start delay for `.strm` files (AList, WebDAV, CloudDrive, remote cloud storage) by intercepting `IMediaSourceManager` and skipping remote `ffprobe` calls. Includes full/incremental batch probing, automatic background probing for newly added media, and a dashboard UI. Requires Jellyfin 12.0+ and .NET 10.0.
