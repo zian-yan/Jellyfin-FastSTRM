@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.2.3] - 2026-11-01
+
+### 🐛 修复
+
+- 后台探测以 `RunTimeTicks` 是否写入判定成败，失败不再打印 `finished`。
+- 起播 10 秒后再探测，失败按 `10s → 30s` 重试，最多 3 次。
+- 批量预探测运行时不再叠加单集重试。
+
+---
+
 ## [3.2.2] - 2026-11-01
 
 ### 💬 优化

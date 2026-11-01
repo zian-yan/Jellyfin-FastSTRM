@@ -25,6 +25,7 @@ public sealed class ProbeService : IHostedService, IDisposable
     private readonly ILogger<ProbeService> _logger;
 
     private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _shutdownCts;
     private Task? _probeTask;
     private readonly object _lock = new();
 
@@ -40,6 +41,27 @@ public sealed class ProbeService : IHostedService, IDisposable
     private readonly ConcurrentDictionary<Guid, DateTime> _lastPlaybackProbeAttemptUtc = new();
 
     private static readonly TimeSpan PlaybackProbeRetryInterval = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// Delays between consecutive background playback-probe attempts. A probe often fails for
+    /// transient reasons — the upstream .strm endpoint returning 5xx while the client is opening
+    /// the very same file, a cloud-drive rate limit, a slow redirect — so a short retry usually
+    /// succeeds without waiting for the next playback.
+    /// Tune these values to trade retry aggressiveness against load on the stream endpoint.
+    /// </summary>
+    private static readonly TimeSpan[] PlaybackProbeRetryDelays =
+    {
+        TimeSpan.FromSeconds(10),
+        TimeSpan.FromSeconds(30)
+    };
+
+    /// <summary>
+    /// Delay before the first background probe of an item that is currently being played.
+    /// The client still gets its instant direct-play start immediately; the probe waits until the
+    /// player has opened the stream, so the two requests do not hit the stream endpoint at the same
+    /// moment (which is a common cause of 5xx answers to the ffprobe request).
+    /// </summary>
+    private static readonly TimeSpan PlaybackProbeInitialDelay = TimeSpan.FromSeconds(10);
 
     /// <summary>Gets the current task state: Idle, Running, or Stopping.</summary>
     public string State { get; private set; } = "Idle";
@@ -67,6 +89,7 @@ public sealed class ProbeService : IHostedService, IDisposable
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        _shutdownCts = new CancellationTokenSource();
         _libraryManager.ItemAdded += OnItemAdded;
         return Task.CompletedTask;
     }
@@ -74,6 +97,10 @@ public sealed class ProbeService : IHostedService, IDisposable
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _libraryManager.ItemAdded -= OnItemAdded;
+
+        // Cancel pending retry delays so shutdown is not held up by a backoff timer.
+        _shutdownCts?.Cancel();
+
         StopProbe();
         return Task.CompletedTask;
     }
@@ -168,8 +195,11 @@ public sealed class ProbeService : IHostedService, IDisposable
 
     /// <summary>
     /// Schedules a background probe for an unprobed .strm item that is being played.
-    /// Playback itself is never blocked: the duration is filled in shortly after playback
-    /// starts so resume points and completion can be tracked with real metadata.
+    /// Playback itself is never blocked: the client keeps its instant direct-play start, and the
+    /// probe is scheduled <see cref="PlaybackProbeInitialDelay"/> later so it does not compete with
+    /// the player opening the stream. A probe that yields no runtime (typically a transient 5xx
+    /// from the stream endpoint) is retried a few times at short intervals before giving up until
+    /// the next playback.
     /// </summary>
     /// <param name="item">The item that is being played.</param>
     public void SchedulePlaybackProbe(BaseItem item)
@@ -204,16 +234,73 @@ public sealed class ProbeService : IHostedService, IDisposable
         {
             try
             {
+                var shutdownToken = _shutdownCts?.Token ?? CancellationToken.None;
+
                 _logger.LogInformation(
                     "FastSTRM: Playback started before {Name} was probed, filling in duration in the background so playback progress can be tracked",
                     item.Name);
 
-                await ProbeItemAsync(item, CancellationToken.None).ConfigureAwait(false);
+                _logger.LogDebug(
+                    "FastSTRM: Waiting {Delay}s before probing {Name} so the probe does not compete with the player opening the same stream",
+                    (int)PlaybackProbeInitialDelay.TotalSeconds,
+                    item.Name);
 
-                _logger.LogInformation(
-                    "FastSTRM: Background probe of {Name} finished (RunTimeTicks={RunTimeTicks})",
-                    item.Name,
-                    item.RunTimeTicks);
+                await Task.Delay(PlaybackProbeInitialDelay, shutdownToken).ConfigureAwait(false);
+
+                for (var attempt = 0; ; attempt++)
+                {
+                    if (State != "Idle")
+                    {
+                        // A batch probe is running and already covers every unprobed item.
+                        _logger.LogDebug(
+                            "FastSTRM: Dropping background probe of {Name} because a batch probe is running",
+                            item.Name);
+                        return;
+                    }
+
+                    // A failed probe does not throw: Jellyfin logs the provider error and lets the
+                    // refresh finish, so the runtime is the only reliable success signal.
+                    await ProbeItemAsync(item, CancellationToken.None).ConfigureAwait(false);
+
+                    var probedRuntimeTicks = GetProbedRuntimeTicks(item);
+                    if (probedRuntimeTicks is > 0)
+                    {
+                        _logger.LogInformation(
+                            "FastSTRM: Background probe of {Name} finished (RunTimeTicks={RunTimeTicks})",
+                            item.Name,
+                            probedRuntimeTicks);
+                        return;
+                    }
+
+                    if (attempt >= PlaybackProbeRetryDelays.Length)
+                    {
+                        _logger.LogWarning(
+                            "FastSTRM: Background probe of {Name} produced no stream info after {Attempts} attempt(s) "
+                            + "(RunTimeTicks=null). Playback and progress tracking are unaffected; the next playback "
+                            + "retries it, at most once every {Interval}",
+                            item.Name,
+                            attempt + 1,
+                            PlaybackProbeRetryInterval);
+                        return;
+                    }
+
+                    var retryDelay = PlaybackProbeRetryDelays[attempt];
+                    _logger.LogWarning(
+                        "FastSTRM: Background probe of {Name} produced no stream info (RunTimeTicks=null); "
+                        + "retrying in {Delay}s (retry {Retry}/{MaxRetries})",
+                        item.Name,
+                        (int)retryDelay.TotalSeconds,
+                        attempt + 1,
+                        PlaybackProbeRetryDelays.Length);
+
+                    await Task.Delay(retryDelay, shutdownToken).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug(
+                    "FastSTRM: Background probe of {Name} was cancelled because the server is shutting down",
+                    item.Name);
             }
             catch (Exception ex)
             {
@@ -305,8 +392,33 @@ public sealed class ProbeService : IHostedService, IDisposable
     private static bool HasStreamInfo(BaseItem item)
         => item.RunTimeTicks.HasValue && item.RunTimeTicks.Value > 0;
 
+    /// <summary>
+    /// Returns the runtime a probe actually stored, or null when the probe produced nothing.
+    /// The instance passed to the interceptor is not necessarily the instance Jellyfin keeps in
+    /// its cache, so re-read the item from the library before declaring the probe failed.
+    /// </summary>
+    private long? GetProbedRuntimeTicks(BaseItem item)
+    {
+        if (HasStreamInfo(item))
+        {
+            return item.RunTimeTicks;
+        }
+
+        try
+        {
+            var current = _libraryManager.GetItemById(item.Id);
+            return current is not null && HasStreamInfo(current) ? current.RunTimeTicks : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "FastSTRM: Unable to re-read {Name} after probing", item.Name);
+            return null;
+        }
+    }
+
     public void Dispose()
     {
         _cts?.Dispose();
+        _shutdownCts?.Dispose();
     }
 }
