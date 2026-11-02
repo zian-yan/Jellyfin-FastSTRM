@@ -50,6 +50,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             new PluginPageInfo
             {
                 Name = "FastStrmConfigurationPage",
+                // 显示名称与菜单图标决定控制台入口的呈现：开启 EnableInMainMenu 后，
+                // Jellyfin 会把该页面挂到控制台/主菜单，用户无需再手动拼接配置页 URL。
+                DisplayName = "FastSTRM",
+                EnableInMainMenu = true,
+                MenuIcon = "settings",
                 EmbeddedResourcePath = ns + ".Configuration.configPage.html"
             },
             new PluginPageInfo

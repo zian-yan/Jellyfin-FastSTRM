@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/faststrm-banner.png" alt="FastSTRM" width="720">
+</p>
+
 <h1 align="center">Jellyfin-FastSTRM</h1>
 
 <p align="center">为 Jellyfin 打造的 <code>.strm</code> 媒体秒开插件：跳过远程 <code>ffprobe</code> 探测，点击即播。</p>
@@ -53,7 +57,7 @@ FastSTRM 注入 `IMediaSourceManager` 装饰器，让 `.strm` 媒体跳过远程
 | Windows 服务版 | `C:\ProgramData\Jellyfin\Server\plugins\FastSTRM\FastSTRM.dll` |
 | Windows 便携版 | `%LOCALAPPDATA%\jellyfin\plugins\FastSTRM\FastSTRM.dll` |
 
-3. 重启 Jellyfin，在 **控制台 → 插件** 中确认 FastSTRM 已启用。
+3. 重启 Jellyfin，在 **控制台 → 插件** 中确认 FastSTRM 已启用；随后可在控制台菜单点击 **FastSTRM 设置** 直达配置页。
 
 **方式二：源码编译**（需 [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)）
 
@@ -67,7 +71,7 @@ dotnet build -c Release
 
 ## 使用
 
-在 **控制台 → 插件 → FastSTRM** 中：
+在 **控制台** 菜单点击 **FastSTRM 设置** 即可进入（等价于 **控制台 → 插件 → FastSTRM → 设置**；若菜单未显示，可访问 `…/web/index.html#!/configurationpage?name=FastStrmConfigurationPage`）：
 
 - **统计仪表盘**：查看 STRM 总数、已有流信息与缺少流信息的数量。
 - **执行预探测**：选择增量（推荐）或全量，点击 **启动预探测**，可查看进度并随时停止。

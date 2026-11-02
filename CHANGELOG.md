@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### ✨ 新增
+
+- 控制台菜单新增 **FastSTRM 设置** 入口，可直接进入配置页，无需手动拼接 `configurationpage` URL。
+
+### 📖 文档
+
+- README 顶部展示 FastSTRM 横幅图片。
+
+---
+
 ## [3.3.0] - 2026-11-02
 
 ### ✨ 新增
