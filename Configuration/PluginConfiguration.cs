@@ -44,6 +44,13 @@ public class PluginConfiguration : BasePluginConfiguration
     public int BackgroundProbeDelaySeconds { get; set; } = 5;
 
     /// <summary>
+    /// Gets or sets a value indicating whether stopping playback should cancel a pending or
+    /// running background probe. Default <c>true</c>, so a probe does not keep running after
+    /// the client has stopped playback. Only used when background probing is enabled.
+    /// </summary>
+    public bool CancelBackgroundProbeOnPlaybackStop { get; set; } = true;
+
+    /// <summary>
     /// Gets the configured background probe delay clamped to a sane range (0–3600 seconds).
     /// </summary>
     public int GetBackgroundProbeDelaySeconds()

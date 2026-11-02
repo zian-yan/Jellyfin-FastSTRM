@@ -33,7 +33,8 @@ public class FastStrmController : ControllerBase
             Unprobed = unprobed,
             SkipProbeForUnprobedStrm = config?.SkipProbeForUnprobedStrm ?? true,
             EnableBackgroundProbeForUnprobedStrm = config?.EnableBackgroundProbeForUnprobedStrm ?? false,
-            BackgroundProbeDelaySeconds = config?.GetBackgroundProbeDelaySeconds() ?? 5
+            BackgroundProbeDelaySeconds = config?.GetBackgroundProbeDelaySeconds() ?? 5,
+            CancelBackgroundProbeOnPlaybackStop = config?.CancelBackgroundProbeOnPlaybackStop ?? true
         });
     }
 

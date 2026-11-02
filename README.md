@@ -3,7 +3,7 @@
 <p align="center">为 Jellyfin 打造的 <code>.strm</code> 媒体秒开插件：跳过远程 <code>ffprobe</code> 探测，点击即播。</p>
 
 <p align="center">
-  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.2.3-blue" alt="Release"></a>
+  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.3.0-blue" alt="Release"></a>
   <img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple" alt="Jellyfin 12.0+">
   <img src="https://img.shields.io/badge/.NET-10.0-blueviolet" alt=".NET 10.0">
 </p>
@@ -21,6 +21,7 @@ FastSTRM 注入 `IMediaSourceManager` 装饰器，让 `.strm` 媒体跳过远程
 - **全库预探测**：增量探测（仅补缺少流信息的条目）与全量探测。
 - **入库自动探测**：监听媒体库新增事件，新 STRM 后台自动补探测。
 - **起播后策略可选**：默认不补探测；可开启延迟后台补探测（默认 5 秒，可配置）。
+- **停止即取消**：播放停止后默认取消后台补探测，可关闭以继续补全。
 - **进度不丢失**：跳过探测时保留播放位置，开启补探测后恢复「已观看」判定。
 - **控制台面板**：媒体统计、实时进度、一键启停。
 - **REST API**：支持脚本查询状态、启停任务。
@@ -72,7 +73,7 @@ dotnet build -c Release
 - **执行预探测**：选择增量（推荐）或全量，点击 **启动预探测**，可查看进度并随时停止。
 - **入库自动探测**：勾选 **Strm入库自动探测** 并保存。
 - **未探测 STRM 秒开策略**：默认勾选 **未探测的 STRM 文件也跳过探测**；关闭则回退官方探测。
-- **起播后补探测**：可选 **不补探测**（默认）或 **后台补探测**；延迟默认 **5 秒**，可修改（0–3600）。
+- **起播后补探测**：可选 **不补探测**（默认）或 **后台补探测**；延迟默认 **5 秒**（0–3600）；播放停止后默认取消补探测，可关闭。
 
 ## API
 

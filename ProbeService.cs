@@ -10,6 +10,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
+using MediaBrowser.Controller.Session;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -23,6 +24,7 @@ public sealed class ProbeService : IHostedService, IDisposable
 {
     private readonly ILibraryManager _libraryManager;
     private readonly IDirectoryService _directoryService;
+    private readonly ISessionManager _sessionManager;
     private readonly ILogger<ProbeService> _logger;
 
     private CancellationTokenSource? _cts;
@@ -34,6 +36,12 @@ public sealed class ProbeService : IHostedService, IDisposable
     /// Items whose background playback probe is currently running, so one item is never probed twice at once.
     /// </summary>
     private readonly ConcurrentDictionary<Guid, byte> _playbackProbeInFlight = new();
+
+    /// <summary>
+    /// Cancellation source of the background playback probe per item, so stopping playback can
+    /// abort a probe that is waiting for its delay or running an ffprobe.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _playbackProbeCancellation = new();
 
     /// <summary>
     /// Last time a background playback probe was attempted per item. Prevents a failing remote
@@ -71,10 +79,12 @@ public sealed class ProbeService : IHostedService, IDisposable
     public ProbeService(
         ILibraryManager libraryManager,
         IDirectoryService directoryService,
+        ISessionManager sessionManager,
         ILogger<ProbeService> logger)
     {
         _libraryManager = libraryManager;
         _directoryService = directoryService;
+        _sessionManager = sessionManager;
         _logger = logger;
     }
 
@@ -84,12 +94,14 @@ public sealed class ProbeService : IHostedService, IDisposable
     {
         _shutdownCts = new CancellationTokenSource();
         _libraryManager.ItemAdded += OnItemAdded;
+        _sessionManager.PlaybackStopped += OnPlaybackStopped;
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _libraryManager.ItemAdded -= OnItemAdded;
+        _sessionManager.PlaybackStopped -= OnPlaybackStopped;
 
         // Cancel pending retry delays so shutdown is not held up by a backoff timer.
         _shutdownCts?.Cancel();
@@ -126,6 +138,87 @@ public sealed class ProbeService : IHostedService, IDisposable
                 _logger.LogError(ex, "FastSTRM: Auto-probe failed for {Name}", item.Name);
             }
         });
+    }
+
+    // ── Playback stop handling ──
+
+    /// <summary>
+    /// Cancels the background probe of an item as soon as its playback stops, unless the
+    /// administrator opted into letting the probe finish. A probe that is still waiting for its
+    /// initial delay is cancelled immediately; a running ffprobe receives the cancellation token.
+    /// </summary>
+    private void OnPlaybackStopped(object? sender, PlaybackStopEventArgs e)
+    {
+        if (Plugin.Instance?.Configuration.CancelBackgroundProbeOnPlaybackStop != true)
+        {
+            return;
+        }
+
+        var item = e.Item;
+        if (item is null)
+        {
+            return;
+        }
+
+        if (CancelPlaybackProbe(item.Id))
+        {
+            _logger.LogInformation(
+                "FastSTRM: Playback of {Name} stopped, cancelling its background probe",
+                item.Name);
+        }
+    }
+
+    private bool CancelPlaybackProbe(Guid itemId)
+    {
+        // Allow a probe on the next playback even if this one was cancelled.
+        _lastPlaybackProbeAttemptUtc.TryRemove(itemId, out _);
+
+        if (!_playbackProbeCancellation.TryGetValue(itemId, out var cts))
+        {
+            return false;
+        }
+
+        try
+        {
+            cts.Cancel();
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns true when no active session is playing the item anymore. Used right before each
+    /// probe attempt so a probe that was scheduled or re-scheduled around the stop event cannot
+    /// outlive playback when cancellation on stop is enabled.
+    /// </summary>
+    private bool ShouldSkipProbeForStoppedPlayback(BaseItem item)
+    {
+        if (Plugin.Instance?.Configuration.CancelBackgroundProbeOnPlaybackStop != true)
+        {
+            return false;
+        }
+
+        try
+        {
+            var sessions = _sessionManager.Sessions.ToList();
+            if (sessions.Count == 0)
+            {
+                // Without session information there is nothing to prove that playback stopped.
+                return false;
+            }
+
+            return !sessions.Any(session =>
+                session.NowPlayingItem is not null
+                && session.NowPlayingItem.Id == item.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "FastSTRM: Unable to inspect playback sessions for {Name}", item.Name);
+            return false;
+        }
     }
 
     // ── Public API ──
@@ -227,11 +320,15 @@ public sealed class ProbeService : IHostedService, IDisposable
         var initialDelay = TimeSpan.FromSeconds(
             Math.Clamp(delaySeconds, 0, PluginConfiguration.MaxBackgroundProbeDelaySeconds));
 
+        var probeCts = CancellationTokenSource.CreateLinkedTokenSource(
+            _shutdownCts?.Token ?? CancellationToken.None);
+        _playbackProbeCancellation[item.Id] = probeCts;
+
         _ = Task.Run(async () =>
         {
             try
             {
-                var shutdownToken = _shutdownCts?.Token ?? CancellationToken.None;
+                var token = probeCts.Token;
 
                 _logger.LogInformation(
                     "FastSTRM: Playback started before {Name} was probed, filling in duration in the background so playback progress can be tracked",
@@ -242,7 +339,7 @@ public sealed class ProbeService : IHostedService, IDisposable
                     (int)initialDelay.TotalSeconds,
                     item.Name);
 
-                await Task.Delay(initialDelay, shutdownToken).ConfigureAwait(false);
+                await Task.Delay(initialDelay, token).ConfigureAwait(false);
 
                 for (var attempt = 0; ; attempt++)
                 {
@@ -255,9 +352,20 @@ public sealed class ProbeService : IHostedService, IDisposable
                         return;
                     }
 
+                    // Playback may have stopped while the probe was waiting, and a stop that races
+                    // with scheduling may not have reached the cancellation source in time.
+                    if (ShouldSkipProbeForStoppedPlayback(item))
+                    {
+                        _lastPlaybackProbeAttemptUtc.TryRemove(item.Id, out _);
+                        _logger.LogInformation(
+                            "FastSTRM: Playback of {Name} has stopped, skipping the background probe",
+                            item.Name);
+                        return;
+                    }
+
                     // A failed probe does not throw: Jellyfin logs the provider error and lets the
                     // refresh finish, so the runtime is the only reliable success signal.
-                    await ProbeItemAsync(item, CancellationToken.None).ConfigureAwait(false);
+                    await ProbeItemAsync(item, token).ConfigureAwait(false);
 
                     var probedRuntimeTicks = GetProbedRuntimeTicks(item);
                     if (probedRuntimeTicks is > 0)
@@ -290,13 +398,13 @@ public sealed class ProbeService : IHostedService, IDisposable
                         attempt + 1,
                         PlaybackProbeRetryDelays.Length);
 
-                    await Task.Delay(retryDelay, shutdownToken).ConfigureAwait(false);
+                    await Task.Delay(retryDelay, token).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
             {
                 _logger.LogDebug(
-                    "FastSTRM: Background probe of {Name} was cancelled because the server is shutting down",
+                    "FastSTRM: Background probe of {Name} was cancelled because playback stopped or the server is shutting down",
                     item.Name);
             }
             catch (Exception ex)
@@ -306,6 +414,10 @@ public sealed class ProbeService : IHostedService, IDisposable
             finally
             {
                 _playbackProbeInFlight.TryRemove(item.Id, out _);
+                if (_playbackProbeCancellation.TryRemove(item.Id, out var cts))
+                {
+                    cts.Dispose();
+                }
             }
         });
     }

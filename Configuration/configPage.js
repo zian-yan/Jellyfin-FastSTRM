@@ -18,6 +18,8 @@ export default function (view) {
     var selectUnprobedPlaybackMode = view.querySelector('#selectUnprobedPlaybackMode');
     var txtBackgroundProbeDelay = view.querySelector('#txtBackgroundProbeDelay');
     var backgroundProbeDelayContainer = view.querySelector('#backgroundProbeDelayContainer');
+    var chkCancelProbeOnPlaybackStop = view.querySelector('#chkCancelProbeOnPlaybackStop');
+    var cancelProbeOnStopContainer = view.querySelector('#cancelProbeOnStopContainer');
     var form = view.querySelector('.fastStrmConfigurationForm');
 
     var pollTimer = null;
@@ -40,14 +42,16 @@ export default function (view) {
         return Math.min(3600, Math.max(0, seconds));
     }
 
-    // 下拉框与延迟输入只在“跳过探测”开启时可用；延迟只在“后台补探测”模式下可用。
+    // 下拉框、延迟与停止策略只在“跳过探测”开启时可用；后两者只在“后台补探测”模式下可用。
     function updateUnprobedPlaybackState() {
         var instantPlayback = chkSkipProbeForUnprobed.checked;
         var backgroundProbe = instantPlayback && selectUnprobedPlaybackMode.value === 'Background';
 
         selectUnprobedPlaybackMode.disabled = !instantPlayback;
         txtBackgroundProbeDelay.disabled = !backgroundProbe;
+        chkCancelProbeOnPlaybackStop.disabled = !backgroundProbe;
         backgroundProbeDelayContainer.style.opacity = backgroundProbe ? '1' : '0.5';
+        cancelProbeOnStopContainer.style.opacity = backgroundProbe ? '1' : '0.5';
     }
 
     // ── Data loading ──
@@ -92,6 +96,8 @@ export default function (view) {
                 ? 'Background'
                 : 'None';
             txtBackgroundProbeDelay.value = clampDelaySeconds(config.BackgroundProbeDelaySeconds);
+            // 默认开启：旧配置文件中没有该字段时，播放停止即取消补探测
+            chkCancelProbeOnPlaybackStop.checked = config.CancelBackgroundProbeOnPlaybackStop !== false;
             updateUnprobedPlaybackState();
         });
     }
@@ -132,6 +138,7 @@ export default function (view) {
             config.SkipProbeForUnprobedStrm = chkSkipProbeForUnprobed.checked;
             config.EnableBackgroundProbeForUnprobedStrm = selectUnprobedPlaybackMode.value === 'Background';
             config.BackgroundProbeDelaySeconds = clampDelaySeconds(txtBackgroundProbeDelay.value);
+            config.CancelBackgroundProbeOnPlaybackStop = chkCancelProbeOnPlaybackStop.checked;
             txtBackgroundProbeDelay.value = config.BackgroundProbeDelaySeconds;
             ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                 Dashboard.processPluginConfigurationUpdateResult();
