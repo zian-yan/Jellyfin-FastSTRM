@@ -23,6 +23,7 @@ export default function (view) {
     var form = view.querySelector('.fastStrmConfigurationForm');
 
     var pollTimer = null;
+    var visible = false;
 
     // ── Helpers ──
 
@@ -65,7 +66,7 @@ export default function (view) {
     }
 
     function loadStatus() {
-        apiGet('FastStrm/Probe/Status').then(function (data) {
+        return apiGet('FastStrm/Probe/Status').then(function (data) {
             var stateMap = { Idle: '空闲', Running: '运行中', Stopping: '停止中' };
             lblStatus.textContent = '执行状态: ' + (stateMap[data.State] || data.State);
             lblCurrentItem.textContent = data.CurrentItem || '-';
@@ -76,7 +77,7 @@ export default function (view) {
             if (data.State === 'Running' || data.State === 'Stopping') {
                 btnStart.style.display = 'none';
                 btnStop.style.display = 'inline-flex';
-                startPolling();
+                scheduleNextPoll();
             } else {
                 btnStart.style.display = 'inline-flex';
                 btnStop.style.display = 'none';
@@ -104,15 +105,32 @@ export default function (view) {
 
     // ── Polling ──
 
-    function startPolling() {
-        if (!pollTimer) {
-            pollTimer = setInterval(loadStatus, 1500);
+    // A self-rescheduling timeout instead of setInterval: it never stacks requests when the
+    // server is slow, and `visible` prevents an in-flight response from restarting polling
+    // after the page was hidden.
+    function scheduleNextPoll() {
+        if (!visible || pollTimer) {
+            return;
         }
+        pollTimer = setTimeout(pollStatus, 1500);
+    }
+
+    function pollStatus() {
+        pollTimer = null;
+        if (!visible) {
+            return;
+        }
+
+        loadStatus().catch(function () {
+            // Keep polling after a transient request failure; a successful response decides
+            // whether another round is needed.
+            scheduleNextPoll();
+        });
     }
 
     function stopPolling() {
         if (pollTimer) {
-            clearInterval(pollTimer);
+            clearTimeout(pollTimer);
             pollTimer = null;
         }
     }
@@ -152,13 +170,17 @@ export default function (view) {
     // ── Page lifecycle ──
 
     view.addEventListener('viewshow', function () {
+        visible = true;
         loadSummary();
-        loadStatus();
+        loadStatus().catch(function () {
+            // Transient failure while opening the page; the next status poll/visit retries.
+        });
         loadConfig();
         updateUnprobedPlaybackState();
     });
 
     view.addEventListener('viewhide', function () {
+        visible = false;
         stopPolling();
     });
 }

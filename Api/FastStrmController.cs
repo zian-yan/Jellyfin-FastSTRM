@@ -49,7 +49,7 @@ public class FastStrmController : ControllerBase
             return NoContent();
         }
 
-        return Conflict(new { Message = "A probe task is already running." });
+        return Conflict(new { Message = "A probe task is already running or still stopping." });
     }
 
     /// <summary>

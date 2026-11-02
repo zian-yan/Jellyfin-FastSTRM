@@ -27,19 +27,21 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         // Decorate IMediaSourceManager to skip ffprobe for .strm playback.
         DecorateService<IMediaSourceManager>(
             serviceCollection,
-            (sp, inner) => new MediaSourceInterceptor(
+            (sp, inner, ownsInner) => new MediaSourceInterceptor(
                 inner,
                 sp.GetRequiredService<ILogger<MediaSourceInterceptor>>(),
-                sp));
+                sp,
+                ownsInner));
 
         // Decorate IUserDataManager so progress reported for an item that is still being
         // probed is not thrown away by Jellyfin's "unknown runtime means fully played" rule.
         DecorateService<IUserDataManager>(
             serviceCollection,
-            (sp, inner) => new PlaybackStateInterceptor(
+            (sp, inner, ownsInner) => new PlaybackStateInterceptor(
                 inner,
                 sp,
-                sp.GetRequiredService<ILogger<PlaybackStateInterceptor>>()));
+                sp.GetRequiredService<ILogger<PlaybackStateInterceptor>>(),
+                ownsInner));
     }
 
     /// <summary>
@@ -47,7 +49,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     /// </summary>
     private static void DecorateService<TService>(
         IServiceCollection serviceCollection,
-        Func<IServiceProvider, TService, TService> decoratorFactory)
+        Func<IServiceProvider, TService, bool, TService> decoratorFactory)
         where TService : class
     {
         var descriptor = serviceCollection.FirstOrDefault(d => d.ServiceType == typeof(TService));
@@ -59,26 +61,39 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.Remove(descriptor);
         serviceCollection.Add(new ServiceDescriptor(
             typeof(TService),
-            sp => decoratorFactory(sp, CreateInstance<TService>(sp, descriptor)),
+            sp =>
+            {
+                var (inner, ownsInner) = CreateInstance<TService>(sp, descriptor);
+                return decoratorFactory(sp, inner, ownsInner);
+            },
             descriptor.Lifetime));
     }
 
-    private static TService CreateInstance<TService>(IServiceProvider serviceProvider, ServiceDescriptor descriptor)
+    private static (TService Instance, bool Owned) CreateInstance<TService>(
+        IServiceProvider serviceProvider,
+        ServiceDescriptor descriptor)
         where TService : class
     {
         if (descriptor.ImplementationInstance is TService instance)
         {
-            return instance;
+            // The container owns this instance; disposing it from the decorator would be wrong.
+            return (instance, false);
         }
 
         if (descriptor.ImplementationFactory is not null)
         {
-            return (TService)descriptor.ImplementationFactory(serviceProvider);
+            // A factory can return a cached or shared instance, so its ownership is unknown.
+            // The decorator must not dispose it.
+            return ((TService)descriptor.ImplementationFactory(serviceProvider), false);
         }
 
         if (descriptor.ImplementationType is not null)
         {
-            return (TService)ActivatorUtilities.CreateInstance(serviceProvider, descriptor.ImplementationType);
+            // ActivatorUtilities creates the instance outside the container's tracking, so the
+            // decorator is the only owner and must dispose it.
+            return (
+                (TService)ActivatorUtilities.CreateInstance(serviceProvider, descriptor.ImplementationType),
+                true);
         }
 
         throw new InvalidOperationException(

@@ -26,9 +26,23 @@ namespace FastSTRM;
 /// </summary>
 public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
 {
+    /// <summary>
+    /// Upper bound for the "warning already emitted" marker map. The map is only used to avoid
+    /// repeating the same log line, so clearing it when full merely allows a duplicate warning
+    /// later; it must never grow with the library.
+    /// </summary>
+    private const int MaxWarnedItems = 8192;
+
     private readonly IMediaSourceManager _inner;
     private readonly ILogger<MediaSourceInterceptor> _logger;
     private readonly IServiceProvider _serviceProvider;
+
+    /// <summary>
+    /// Whether this decorator is the only owner of <see cref="_inner"/>. An instance that came
+    /// from <c>ImplementationInstance</c> or an arbitrary factory may be shared, so disposing it
+    /// from here could break the rest of the server.
+    /// </summary>
+    private readonly bool _disposeInner;
 
     /// <summary>
     /// Items for which the "no stream info" warning has already been emitted,
@@ -39,11 +53,13 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
     public MediaSourceInterceptor(
         IMediaSourceManager inner,
         ILogger<MediaSourceInterceptor> logger,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        bool disposeInner)
     {
         _inner = inner;
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _disposeInner = disposeInner;
     }
 
     /// <summary>
@@ -140,6 +156,8 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
     {
         if (hasStreamInfo)
         {
+            // The item now has stream info, so its "missing stream info" marker is obsolete.
+            _warnedItems.TryRemove(item.Id, out _);
             return;
         }
 
@@ -147,7 +165,20 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
             source.MediaStreams is not null
             && source.MediaStreams.Any(stream => stream.Type == MediaStreamType.Video));
 
-        if (hasVideoStream || !_warnedItems.TryAdd(item.Id, 0))
+        if (hasVideoStream)
+        {
+            // Video stream information is available, so the warning marker is obsolete.
+            _warnedItems.TryRemove(item.Id, out _);
+            return;
+        }
+
+        if (_warnedItems.Count >= MaxWarnedItems)
+        {
+            // Only the log de-duplication marker is dropped; playback is unaffected.
+            _warnedItems.Clear();
+        }
+
+        if (!_warnedItems.TryAdd(item.Id, 0))
         {
             return;
         }
@@ -233,7 +264,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
 
     public void Dispose()
     {
-        if (_inner is IDisposable disposable)
+        if (_disposeInner && _inner is IDisposable disposable)
         {
             disposable.Dispose();
         }

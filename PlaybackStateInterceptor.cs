@@ -27,11 +27,25 @@ namespace FastSTRM;
 /// detection takes over again. When background probing is disabled, the position is preserved
 /// but completion stays undetectable until a probe runs.
 /// </remarks>
-public sealed class PlaybackStateInterceptor : IUserDataManager
+public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
 {
+    /// <summary>
+    /// Upper bound for the "position preserved" notice map. The map is only used to avoid
+    /// repeating the same log line, so clearing it when full merely allows a duplicate notice
+    /// later; it must never grow with the library.
+    /// </summary>
+    private const int MaxPreservedItems = 8192;
+
     private readonly IUserDataManager _inner;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<PlaybackStateInterceptor> _logger;
+
+    /// <summary>
+    /// Whether this decorator is the only owner of <see cref="_inner"/>. An instance that came
+    /// from <c>ImplementationInstance</c> or an arbitrary factory may be shared, so disposing it
+    /// from here could break the rest of the server.
+    /// </summary>
+    private readonly bool _disposeInner;
 
     /// <summary>
     /// Items for which the "duration unknown, keeping position" notice was already logged.
@@ -41,11 +55,13 @@ public sealed class PlaybackStateInterceptor : IUserDataManager
     public PlaybackStateInterceptor(
         IUserDataManager inner,
         IServiceProvider serviceProvider,
-        ILogger<PlaybackStateInterceptor> logger)
+        ILogger<PlaybackStateInterceptor> logger,
+        bool disposeInner)
     {
         _inner = inner;
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _disposeInner = disposeInner;
     }
 
     /// <inheritdoc />
@@ -90,6 +106,13 @@ public sealed class PlaybackStateInterceptor : IUserDataManager
     /// <inheritdoc />
     public bool UpdatePlayState(BaseItem item, UserItemData data, long? reportedPositionTicks)
     {
+        if (IsStrmItem(item) && HasKnownRuntime(item))
+        {
+            // The background probe has stored a duration, so the "position preserved" marker for
+            // this item is obsolete. Dropping it keeps the map bounded by the unprobed items.
+            _preservedItems.TryRemove(item.Id, out _);
+        }
+
         // Only .strm items whose duration is still unknown are affected by Jellyfin's
         // "unknown runtime means fully played" fallback. Once the background probe has
         // stored a runtime, the original implementation must handle completion again.
@@ -109,21 +132,30 @@ public sealed class PlaybackStateInterceptor : IUserDataManager
                     ? config.GetBackgroundProbeDelaySeconds()
                     : (int?)null;
 
-            if (reportedPositionTicks.Value > 0 && _preservedItems.TryAdd(item.Id, 0))
+            if (reportedPositionTicks.Value > 0)
             {
-                if (backgroundProbeDelaySeconds.HasValue)
+                if (_preservedItems.Count >= MaxPreservedItems)
                 {
-                    _logger.LogInformation(
-                        "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; probing in background so completion can be tracked",
-                        reportedPositionTicks.Value,
-                        item.Name);
+                    // Only the log de-duplication marker is dropped; playback is unaffected.
+                    _preservedItems.Clear();
                 }
-                else
+
+                if (_preservedItems.TryAdd(item.Id, 0))
                 {
-                    _logger.LogInformation(
-                        "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; background probing is disabled, so completion cannot be tracked until a probe runs",
-                        reportedPositionTicks.Value,
-                        item.Name);
+                    if (backgroundProbeDelaySeconds.HasValue)
+                    {
+                        _logger.LogInformation(
+                            "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; probing in background so completion can be tracked",
+                            reportedPositionTicks.Value,
+                            item.Name);
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; background probing is disabled, so completion cannot be tracked until a probe runs",
+                            reportedPositionTicks.Value,
+                            item.Name);
+                    }
                 }
             }
 
@@ -158,6 +190,14 @@ public sealed class PlaybackStateInterceptor : IUserDataManager
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "FastSTRM: Unable to schedule a background probe for {Name}", item.Name);
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposeInner && _inner is IDisposable disposable)
+        {
+            disposable.Dispose();
         }
     }
 }
