@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/main/images/faststrm-banner.png",
     "versions": [
       {
+        "version": "3.3.1.0",
+        "changelog": "### ✨ 新增\n\n- 控制台菜单新增 **FastSTRM 设置** 入口，可直接进入配置页，无需手动拼接 `configurationpage` URL。\n\n### 📖 文档\n\n- README 顶部展示 FastSTRM 横幅图片。\n\n---",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/zian-yan/Jellyfin-FastSTRM/releases/download/v3.3.1/FastSTRM.zip",
+        "checksum": "e56a995b21e962054fe08bcf3d87225b",
+        "timestamp": "2026-11-02T04:07:25Z"
+      },
+      {
         "version": "3.3.0.0",
         "changelog": "### ✨ 新增\n\n- 未探测 `.strm` 起播后可选 **不补探测**（默认）或 **后台补探测**。\n- 后台补探测延迟可配置，默认 **5 秒**（0–3600）。\n- 新增「播放停止后取消补探测」开关，默认开启。\n- `GET /FastStrm/Summary` 新增后台补探测相关字段。\n\n### 💬 优化\n\n- 关闭后台补探测时保留播放位置，不再补全时长。\n\n### ⚠️ 变更\n\n- 未探测 `.strm` 默认不再后台补探测；需要时长/轨道信息时请在配置页开启「后台补探测」。\n\n---",
         "targetAbi": "12.0.0.0",
