@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### ✨ 新增
+
+- 未探测 `.strm` 起播后可选 **不补探测**（默认）或 **后台补探测**。
+- 后台补探测延迟可配置，默认 **5 秒**（0–3600）。
+- `GET /FastStrm/Summary` 新增后台补探测开关与延迟字段。
+
+### 💬 优化
+
+- 关闭后台补探测时保留播放位置，不再补全时长。
+
+---
+
 ## [3.2.3] - 2026-11-01
 
 ### 🐛 修复

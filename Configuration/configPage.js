@@ -15,6 +15,9 @@ export default function (view) {
     var lblCurrentItem = view.querySelector('#lblCurrentItem');
     var chkAutoProbe = view.querySelector('#chkEnableAutoProbe');
     var chkSkipProbeForUnprobed = view.querySelector('#chkSkipProbeForUnprobedStrm');
+    var selectUnprobedPlaybackMode = view.querySelector('#selectUnprobedPlaybackMode');
+    var txtBackgroundProbeDelay = view.querySelector('#txtBackgroundProbeDelay');
+    var backgroundProbeDelayContainer = view.querySelector('#backgroundProbeDelayContainer');
     var form = view.querySelector('.fastStrmConfigurationForm');
 
     var pollTimer = null;
@@ -27,6 +30,24 @@ export default function (view) {
 
     function apiPost(path) {
         return ApiClient.ajax({ url: ApiClient.getUrl(path), type: 'POST' });
+    }
+
+    function clampDelaySeconds(value) {
+        var seconds = parseInt(value, 10);
+        if (isNaN(seconds)) {
+            return 5;
+        }
+        return Math.min(3600, Math.max(0, seconds));
+    }
+
+    // 下拉框与延迟输入只在“跳过探测”开启时可用；延迟只在“后台补探测”模式下可用。
+    function updateUnprobedPlaybackState() {
+        var instantPlayback = chkSkipProbeForUnprobed.checked;
+        var backgroundProbe = instantPlayback && selectUnprobedPlaybackMode.value === 'Background';
+
+        selectUnprobedPlaybackMode.disabled = !instantPlayback;
+        txtBackgroundProbeDelay.disabled = !backgroundProbe;
+        backgroundProbeDelayContainer.style.opacity = backgroundProbe ? '1' : '0.5';
     }
 
     // ── Data loading ──
@@ -66,6 +87,12 @@ export default function (view) {
             chkAutoProbe.checked = config.EnableAutoProbe;
             // 默认值为 true：旧配置文件中没有该字段时也保持"跳过探测"的极速模式
             chkSkipProbeForUnprobed.checked = config.SkipProbeForUnprobedStrm !== false;
+            // 默认不补探测：旧配置文件中没有该字段时按“直接起播，不补探测”处理
+            selectUnprobedPlaybackMode.value = config.EnableBackgroundProbeForUnprobedStrm === true
+                ? 'Background'
+                : 'None';
+            txtBackgroundProbeDelay.value = clampDelaySeconds(config.BackgroundProbeDelaySeconds);
+            updateUnprobedPlaybackState();
         });
     }
 
@@ -103,11 +130,17 @@ export default function (view) {
         ApiClient.getPluginConfiguration(pluginId).then(function (config) {
             config.EnableAutoProbe = chkAutoProbe.checked;
             config.SkipProbeForUnprobedStrm = chkSkipProbeForUnprobed.checked;
+            config.EnableBackgroundProbeForUnprobedStrm = selectUnprobedPlaybackMode.value === 'Background';
+            config.BackgroundProbeDelaySeconds = clampDelaySeconds(txtBackgroundProbeDelay.value);
+            txtBackgroundProbeDelay.value = config.BackgroundProbeDelaySeconds;
             ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                 Dashboard.processPluginConfigurationUpdateResult();
             });
         });
     });
+
+    chkSkipProbeForUnprobed.addEventListener('change', updateUnprobedPlaybackState);
+    selectUnprobedPlaybackMode.addEventListener('change', updateUnprobedPlaybackState);
 
     // ── Page lifecycle ──
 
@@ -115,6 +148,7 @@ export default function (view) {
         loadSummary();
         loadStatus();
         loadConfig();
+        updateUnprobedPlaybackState();
     });
 
     view.addEventListener('viewhide', function () {

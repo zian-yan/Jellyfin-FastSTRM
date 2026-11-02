@@ -23,7 +23,9 @@ namespace FastSTRM;
 /// That is why, with probing skipped, third-party clients lose their resume point on every
 /// progress report and the item is marked watched as soon as playback starts/stops.
 /// This decorator stores the reported position instead and lets a background probe fill in
-/// the duration, after which Jellyfin's normal completion detection takes over again.
+/// the duration (when background probing is enabled), after which Jellyfin's normal completion
+/// detection takes over again. When background probing is disabled, the position is preserved
+/// but completion stays undetectable until a probe runs.
 /// </remarks>
 public sealed class PlaybackStateInterceptor : IUserDataManager
 {
@@ -98,15 +100,38 @@ public sealed class PlaybackStateInterceptor : IUserDataManager
         {
             data.PlaybackPositionTicks = reportedPositionTicks.Value;
 
+            // The administrator decides whether an instantly-started, unprobed item is also
+            // probed in the background. When it is disabled, keep the position but never touch
+            // the stream endpoint a second time. The official-probe fallback (skip disabled)
+            // handles probing itself, so no background probe is scheduled in that mode either.
+            var backgroundProbeDelaySeconds = Plugin.Instance?.Configuration
+                is { SkipProbeForUnprobedStrm: true, EnableBackgroundProbeForUnprobedStrm: true } config
+                    ? config.GetBackgroundProbeDelaySeconds()
+                    : (int?)null;
+
             if (reportedPositionTicks.Value > 0 && _preservedItems.TryAdd(item.Id, 0))
             {
-                _logger.LogInformation(
-                    "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; probing in background so completion can be tracked",
-                    reportedPositionTicks.Value,
-                    item.Name);
+                if (backgroundProbeDelaySeconds.HasValue)
+                {
+                    _logger.LogInformation(
+                        "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; probing in background so completion can be tracked",
+                        reportedPositionTicks.Value,
+                        item.Name);
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; background probing is disabled, so completion cannot be tracked until a probe runs",
+                        reportedPositionTicks.Value,
+                        item.Name);
+                }
             }
 
-            ScheduleBackgroundProbe(item);
+            if (backgroundProbeDelaySeconds.HasValue)
+            {
+                ScheduleBackgroundProbe(item, backgroundProbeDelaySeconds.Value);
+            }
+
             return false;
         }
 
@@ -124,11 +149,11 @@ public sealed class PlaybackStateInterceptor : IUserDataManager
     private static bool HasKnownRuntime(BaseItem item)
         => item.RunTimeTicks.HasValue && item.RunTimeTicks.Value > 0;
 
-    private void ScheduleBackgroundProbe(BaseItem item)
+    private void ScheduleBackgroundProbe(BaseItem item, int delaySeconds)
     {
         try
         {
-            _serviceProvider.GetService<ProbeService>()?.SchedulePlaybackProbe(item);
+            _serviceProvider.GetService<ProbeService>()?.SchedulePlaybackProbe(item, delaySeconds);
         }
         catch (Exception ex)
         {

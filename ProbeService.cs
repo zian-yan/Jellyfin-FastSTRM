@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using FastSTRM.Configuration;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.IO;
@@ -54,14 +55,6 @@ public sealed class ProbeService : IHostedService, IDisposable
         TimeSpan.FromSeconds(10),
         TimeSpan.FromSeconds(30)
     };
-
-    /// <summary>
-    /// Delay before the first background probe of an item that is currently being played.
-    /// The client still gets its instant direct-play start immediately; the probe waits until the
-    /// player has opened the stream, so the two requests do not hit the stream endpoint at the same
-    /// moment (which is a common cause of 5xx answers to the ffprobe request).
-    /// </summary>
-    private static readonly TimeSpan PlaybackProbeInitialDelay = TimeSpan.FromSeconds(10);
 
     /// <summary>Gets the current task state: Idle, Running, or Stopping.</summary>
     public string State { get; private set; } = "Idle";
@@ -196,13 +189,14 @@ public sealed class ProbeService : IHostedService, IDisposable
     /// <summary>
     /// Schedules a background probe for an unprobed .strm item that is being played.
     /// Playback itself is never blocked: the client keeps its instant direct-play start, and the
-    /// probe is scheduled <see cref="PlaybackProbeInitialDelay"/> later so it does not compete with
-    /// the player opening the stream. A probe that yields no runtime (typically a transient 5xx
-    /// from the stream endpoint) is retried a few times at short intervals before giving up until
-    /// the next playback.
+    /// probe waits <paramref name="delaySeconds"/> (the administrator-configured delay, default
+    /// 5 seconds) so it does not compete with the player opening the stream. A probe that yields
+    /// no runtime (typically a transient 5xx from the stream endpoint) is retried a few times at
+    /// short intervals before giving up until the next playback.
     /// </summary>
     /// <param name="item">The item that is being played.</param>
-    public void SchedulePlaybackProbe(BaseItem item)
+    /// <param name="delaySeconds">Seconds to wait after playback started before probing.</param>
+    public void SchedulePlaybackProbe(BaseItem item, int delaySeconds)
     {
         if (!IsStrmItem(item) || HasStreamInfo(item))
         {
@@ -230,6 +224,9 @@ public sealed class ProbeService : IHostedService, IDisposable
 
         _lastPlaybackProbeAttemptUtc[item.Id] = now;
 
+        var initialDelay = TimeSpan.FromSeconds(
+            Math.Clamp(delaySeconds, 0, PluginConfiguration.MaxBackgroundProbeDelaySeconds));
+
         _ = Task.Run(async () =>
         {
             try
@@ -242,10 +239,10 @@ public sealed class ProbeService : IHostedService, IDisposable
 
                 _logger.LogDebug(
                     "FastSTRM: Waiting {Delay}s before probing {Name} so the probe does not compete with the player opening the same stream",
-                    (int)PlaybackProbeInitialDelay.TotalSeconds,
+                    (int)initialDelay.TotalSeconds,
                     item.Name);
 
-                await Task.Delay(PlaybackProbeInitialDelay, shutdownToken).ConfigureAwait(false);
+                await Task.Delay(initialDelay, shutdownToken).ConfigureAwait(false);
 
                 for (var attempt = 0; ; attempt++)
                 {

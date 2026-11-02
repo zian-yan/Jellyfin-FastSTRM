@@ -80,7 +80,28 @@
                     </label>
                 </div>
                 <div class="fieldDescription" style="margin-top: -0.4em; margin-bottom: 1em;">
-                    开启：跳过 ffprobe，点击即播，后台补探测；关闭：回退官方探测。
+                    开启：跳过 ffprobe 直接起播；关闭：回退官方探测。
+                </div>
+
+                <div id="unprobedPlaybackOptions" style="margin-left: 1.7em; margin-bottom: 1em;">
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="selectUnprobedPlaybackMode">起播后策略</label>
+                        <select is="emby-select" id="selectUnprobedPlaybackMode" class="emby-select-withcolor emby-select">
+                            <option value="None">不补探测（默认）</option>
+                            <option value="Background">后台补探测</option>
+                        </select>
+                        <div class="fieldDescription">
+                            仅在开关开启时生效；不补探测不会再次请求流地址。
+                        </div>
+                    </div>
+
+                    <div class="inputContainer" id="backgroundProbeDelayContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="txtBackgroundProbeDelay">补探测延迟（秒）</label>
+                        <input is="emby-input" type="number" id="txtBackgroundProbeDelay" min="0" max="3600" step="1" value="5" />
+                        <div class="fieldDescription">
+                            默认 5 秒，范围 0–3600。
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">

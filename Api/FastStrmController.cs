@@ -25,12 +25,15 @@ public class FastStrmController : ControllerBase
     public ActionResult GetSummary()
     {
         var (total, probed, unprobed) = _probeService.GetSummary();
+        var config = Plugin.Instance?.Configuration;
         return Ok(new
         {
             Total = total,
             Probed = probed,
             Unprobed = unprobed,
-            SkipProbeForUnprobedStrm = Plugin.Instance?.Configuration.SkipProbeForUnprobedStrm ?? true
+            SkipProbeForUnprobedStrm = config?.SkipProbeForUnprobedStrm ?? true,
+            EnableBackgroundProbeForUnprobedStrm = config?.EnableBackgroundProbeForUnprobedStrm ?? false,
+            BackgroundProbeDelaySeconds = config?.GetBackgroundProbeDelaySeconds() ?? 5
         });
     }
 

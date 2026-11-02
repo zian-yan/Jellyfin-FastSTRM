@@ -53,6 +53,10 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
     /// 3. .strm without stream info → allowMediaProbe = false as well by default
     ///    (instant start, no remote probe); admins can opt back into the official
     ///    probing fallback via <see cref="Configuration.PluginConfiguration.SkipProbeForUnprobedStrm"/>.
+    ///    When the instant path is used, a background probe is scheduled only if
+    ///    <see cref="Configuration.PluginConfiguration.EnableBackgroundProbeForUnprobedStrm"/> is enabled,
+    ///    after <see cref="Configuration.PluginConfiguration.BackgroundProbeDelaySeconds"/> seconds
+    ///    (default: no background probe).
     /// </summary>
     public async Task<IReadOnlyList<MediaSourceInfo>> GetPlaybackMediaSources(
         BaseItem item,
@@ -69,8 +73,9 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
         }
 
         var hasStreamInfo = item.RunTimeTicks.HasValue && item.RunTimeTicks.Value > 0;
+        var config = Plugin.Instance?.Configuration;
         var skipProbe = hasStreamInfo
-                        || (Plugin.Instance?.Configuration.SkipProbeForUnprobedStrm ?? true);
+                        || (config?.SkipProbeForUnprobedStrm ?? true);
 
         if (!skipProbe)
         {
@@ -92,24 +97,26 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
             item, user, allowMediaProbe: false, enablePathSubstitution, cancellationToken)
             .ConfigureAwait(false);
 
-        if (!hasStreamInfo)
+        int? backgroundProbeDelaySeconds = null;
+        if (!hasStreamInfo && config is { EnableBackgroundProbeForUnprobedStrm: true })
         {
             // Playback starts immediately, but a duration is required for Jellyfin to save
             // resume points and to decide when an item has been watched to completion.
             // Schedule the probe after the playback sources are built so the response and the
             // background refresh never touch the item at the same time.
-            ScheduleBackgroundProbe(item);
+            backgroundProbeDelaySeconds = config.GetBackgroundProbeDelaySeconds();
+            ScheduleBackgroundProbe(item, backgroundProbeDelaySeconds.Value);
         }
 
-        WarnIfStreamInfoMissing(item, hasStreamInfo, sources);
+        WarnIfStreamInfoMissing(item, hasStreamInfo, sources, backgroundProbeDelaySeconds);
         return sources;
     }
 
-    private void ScheduleBackgroundProbe(BaseItem item)
+    private void ScheduleBackgroundProbe(BaseItem item, int delaySeconds)
     {
         try
         {
-            _serviceProvider.GetService<ProbeService>()?.SchedulePlaybackProbe(item);
+            _serviceProvider.GetService<ProbeService>()?.SchedulePlaybackProbe(item, delaySeconds);
         }
         catch (Exception ex)
         {
@@ -128,7 +135,8 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
     private void WarnIfStreamInfoMissing(
         BaseItem item,
         bool hasStreamInfo,
-        IReadOnlyList<MediaSourceInfo> sources)
+        IReadOnlyList<MediaSourceInfo> sources,
+        int? backgroundProbeDelaySeconds)
     {
         if (hasStreamInfo)
         {
@@ -144,9 +152,20 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
             return;
         }
 
+        if (backgroundProbeDelaySeconds.HasValue)
+        {
+            _logger.LogWarning(
+                "FastSTRM: {Name} has no stream info and probing was skipped for instant playback. "
+                + "Playback progress is kept; a background probe in {Delay}s fills in the duration/track information.",
+                item.Name,
+                backgroundProbeDelaySeconds.Value);
+            return;
+        }
+
         _logger.LogWarning(
             "FastSTRM: {Name} has no stream info and probing was skipped for instant playback. "
-            + "Playback progress is kept; a background probe fills in the duration/track information.",
+            + "Playback progress is kept, but background probing is disabled, so the duration/track "
+            + "information stays unavailable until a probe runs (enable background probing or run an incremental probe).",
             item.Name);
     }
 
