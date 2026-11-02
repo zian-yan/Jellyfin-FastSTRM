@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/faststrm-banner.png" alt="FastSTRM" width="720">
+  <img src="images/faststrm-banner.png" alt="FastSTRM" width="520">
 </p>
 
 <h1 align="center">Jellyfin-FastSTRM</h1>
