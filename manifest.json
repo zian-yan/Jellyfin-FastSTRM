@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/main/images/faststrm-banner.png",
     "versions": [
       {
+        "version": "3.3.0.0",
+        "changelog": "### ✨ 新增\n\n- 未探测 `.strm` 起播后可选 **不补探测**（默认）或 **后台补探测**。\n- 后台补探测延迟可配置，默认 **5 秒**（0–3600）。\n- 新增「播放停止后取消补探测」开关，默认开启。\n- `GET /FastStrm/Summary` 新增后台补探测相关字段。\n\n### 💬 优化\n\n- 关闭后台补探测时保留播放位置，不再补全时长。\n\n### ⚠️ 变更\n\n- 未探测 `.strm` 默认不再后台补探测；需要时长/轨道信息时请在配置页开启「后台补探测」。\n\n---",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/zian-yan/Jellyfin-FastSTRM/releases/download/v3.3.0/FastSTRM.zip",
+        "checksum": "449d418e3fef34f69b9fd7fe20183828",
+        "timestamp": "2026-11-02T03:34:21Z"
+      },
+      {
         "version": "3.2.3.0",
         "changelog": "### 🐛 修复\n\n- 后台探测以 `RunTimeTicks` 是否写入判定成败，失败不再打印 `finished`。\n- 起播 10 秒后再探测，失败按 `10s → 30s` 重试，最多 3 次。\n- 批量预探测运行时不再叠加单集重试。\n\n---",
         "targetAbi": "12.0.0.0",
