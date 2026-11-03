@@ -14,6 +14,17 @@ public class PluginConfiguration : BasePluginConfiguration
     public const int MaxBackgroundProbeDelaySeconds = 3600;
 
     /// <summary>
+    /// Lower bound for the configurable probe concurrency.
+    /// </summary>
+    public const int MinConcurrentProbes = 1;
+
+    /// <summary>
+    /// Upper bound for the configurable probe concurrency, so a typo cannot flood the
+    /// stream endpoints with parallel probes.
+    /// </summary>
+    public const int MaxConcurrentProbesLimit = 16;
+
+    /// <summary>
     /// Gets or sets a value indicating whether to automatically probe
     /// newly added .strm items that lack stream info.
     /// </summary>
@@ -51,8 +62,21 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool CancelBackgroundProbeOnPlaybackStop { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets the maximum number of concurrent probes. Default <c>1</c>
+    /// keeps the original one-at-a-time behaviour.
+    /// </summary>
+    public int MaxConcurrentProbes { get; set; } = 1;
+
+    /// <summary>
     /// Gets the configured background probe delay clamped to a sane range (0–3600 seconds).
     /// </summary>
     public int GetBackgroundProbeDelaySeconds()
         => Math.Clamp(BackgroundProbeDelaySeconds, 0, MaxBackgroundProbeDelaySeconds);
+
+    /// <summary>
+    /// Gets the configured probe concurrency clamped to
+    /// [<see cref="MinConcurrentProbes"/>, <see cref="MaxConcurrentProbesLimit"/>].
+    /// </summary>
+    public int GetMaxConcurrentProbes()
+        => Math.Clamp(MaxConcurrentProbes, MinConcurrentProbes, MaxConcurrentProbesLimit);
 }

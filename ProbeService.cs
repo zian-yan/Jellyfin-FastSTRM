@@ -34,6 +34,33 @@ public sealed class ProbeService : IHostedService, IDisposable
     /// </summary>
     private static readonly TimeSpan ShutdownTaskTimeout = TimeSpan.FromSeconds(10);
 
+    private const int MaxQueuedAutoProbes = 2048;
+
+    /// <summary>
+    /// Length caps for item names written to the log / rendered in the UI. See <see cref="LogSafe"/>:
+    /// names come from file names on disk, so they must be sanitized before they reach a log sink.
+    /// </summary>
+    private const int MaxLoggedNameLength = LogSafe.MaxLoggedLength;
+    private const int MaxDisplayedNameLength = LogSafe.MaxDisplayedLength;
+
+    /// <summary>
+    /// How long a summary (total/probed/unprobed) stays cached. The config page asks for it on
+    /// every visit and after every probe, while computing it scans the whole video library.
+    /// </summary>
+    private static readonly TimeSpan SummaryCacheTtl = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Minimum interval between two progress log lines during a full library probe.
+    /// </summary>
+    private static readonly TimeSpan ProgressLogInterval = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Minimum interval between two prune passes over the playback-attempt map. The prune is a
+    /// full scan of up to <see cref="MaxTrackedPlaybackAttempts"/> entries and is reached from
+    /// every playback progress report, so it must not run more often than this.
+    /// </summary>
+    private static readonly TimeSpan PruneInterval = TimeSpan.FromSeconds(60);
+
     private readonly ILibraryManager _libraryManager;
     private readonly IDirectoryService _directoryService;
     private readonly ISessionManager _sessionManager;
@@ -45,6 +72,30 @@ public sealed class ProbeService : IHostedService, IDisposable
     private int _probeGeneration;
     private volatile bool _stopping;
     private readonly object _lock = new();
+
+    /// <summary>
+    /// Serializes replacement of the probe gate so a configuration change cannot swap it out
+    /// while probes are still waiting on the previous instance.
+    /// </summary>
+    private readonly object _probeGateLock = new();
+
+    /// <summary>
+    /// Gate that keeps the number of concurrently running probes bounded by the configured
+    /// <see cref="PluginConfiguration.MaxConcurrentProbes"/> (1 by default).
+    /// </summary>
+    private SemaphoreSlim _probeGate = new(1, 1);
+    private int _probeGateLimit = 1;
+    private int _activeProbes;
+    private long _lastProgressLogTicks;
+
+    /// <summary>
+    /// Guards <see cref="_summaryCache"/> so the whole-library scan behind a summary request
+    /// runs once per <see cref="SummaryCacheTtl"/> instead of once per page view.
+    /// </summary>
+    private readonly object _summaryLock = new();
+    private (int Total, int Probed, int Unprobed) _summaryCache;
+    private long _summaryCacheUtcTicks;
+    private long _lastPruneUtcTicks;
 
     /// <summary>
     /// Items whose background playback probe is currently running, so one item is never probed twice at once.
@@ -96,17 +147,39 @@ public sealed class ProbeService : IHostedService, IDisposable
         TimeSpan.FromSeconds(30)
     };
 
+    // The probe state below is written by the probe task and read by the API thread. Writes to
+    // State always happen under _lock, but readers (the status endpoint) do not take the lock,
+    // so the field is volatile to keep a status reader from observing a stale value forever.
+    private volatile string _state = "Idle";
+
+    /// <summary>Total number of items in the current probe batch.</summary>
+    private int _totalItems;
+
+    /// <summary>Number of items already processed in the current batch.</summary>
+    private int _processedItems;
+
+    /// <summary>Name of the item currently being probed, shown on the status endpoint.</summary>
+    private volatile string _currentItemName = string.Empty;
+
     /// <summary>Gets the current task state: Idle, Running, or Stopping.</summary>
-    public string State { get; private set; } = "Idle";
+    public string State
+    {
+        get => _state;
+        private set => _state = value;
+    }
 
     /// <summary>Gets the total number of items in the current probe batch.</summary>
-    public int TotalItems { get; private set; }
-
     /// <summary>Gets the number of items already processed.</summary>
-    public int ProcessedItems { get; private set; }
-
     /// <summary>Gets the name of the item currently being probed.</summary>
-    public string CurrentItemName { get; private set; } = string.Empty;
+    public int TotalItems => Volatile.Read(ref _totalItems);
+
+    public int ProcessedItems => Volatile.Read(ref _processedItems);
+
+    public string CurrentItemName
+    {
+        get => _currentItemName;
+        private set => _currentItemName = value ?? string.Empty;
+    }
 
     public ProbeService(
         ILibraryManager libraryManager,
@@ -231,6 +304,19 @@ public sealed class ProbeService : IHostedService, IDisposable
             return;
         }
 
+        var pendingCount = _autoProbeTasks.Count;
+        if (pendingCount >= MaxQueuedAutoProbes)
+        {
+            // A scan of a very large library must not turn into an unbounded task queue. The
+            // item still gets probed by the next incremental run, so dropping it here is safe.
+            _autoProbeInFlight.TryRemove(item.Id, out _);
+            _logger.LogDebug(
+                "FastSTRM: Skipping auto-probe for {Name}; {Pending} probes are already pending",
+                LogSafe.Name(item, MaxLoggedNameLength),
+                pendingCount);
+            return;
+        }
+
         var token = _shutdownCts?.Token ?? CancellationToken.None;
         try
         {
@@ -246,27 +332,37 @@ public sealed class ProbeService : IHostedService, IDisposable
             // Never let a scheduling failure both escape the event handler and leave the item
             // permanently marked as "already being probed".
             _autoProbeInFlight.TryRemove(item.Id, out _);
-            _logger.LogDebug(ex, "FastSTRM: Unable to schedule the auto-probe for {Name}", item.Name);
+            _logger.LogDebug(ex, "FastSTRM: Unable to schedule the auto-probe for {Name}", LogSafe.Name(item, MaxLoggedNameLength));
         }
     }
 
     private async Task RunAutoProbeAsync(BaseItem item, CancellationToken cancellationToken)
     {
+        SemaphoreSlim? gate = null;
         try
         {
-            _logger.LogInformation("FastSTRM: Auto-probing new item {Name}", item.Name);
+            // Bounded fan-out: at most GetMaxConcurrentProbes() probes run at the same time, the
+            // rest wait here (and are cancellable on shutdown).
+            gate = await AcquireProbeSlotAsync(cancellationToken).ConfigureAwait(false);
+
+            _logger.LogInformation("FastSTRM: Auto-probing new item {Name}", LogSafe.Name(item, MaxLoggedNameLength));
             await ProbeItemAsync(item, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
-            _logger.LogDebug("FastSTRM: Auto-probe of {Name} was cancelled", item.Name);
+            _logger.LogDebug("FastSTRM: Auto-probe of {Name} was cancelled", LogSafe.Name(item, MaxLoggedNameLength));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "FastSTRM: Auto-probe failed for {Name}", item.Name);
+            _logger.LogError(ex, "FastSTRM: Auto-probe failed for {Name}", LogSafe.Name(item, MaxLoggedNameLength));
         }
         finally
         {
+            if (gate is not null)
+            {
+                ReleaseProbeSlot(gate);
+            }
+
             _autoProbeInFlight.TryRemove(item.Id, out _);
             _autoProbeTasks.TryRemove(item.Id, out _);
         }
@@ -298,7 +394,7 @@ public sealed class ProbeService : IHostedService, IDisposable
         {
             _logger.LogDebug(
                 "FastSTRM: Playback of {Name} stopped in one session but another session is still playing it; keeping its background probe",
-                item.Name);
+                LogSafe.Name(item, MaxLoggedNameLength));
             return;
         }
 
@@ -306,7 +402,7 @@ public sealed class ProbeService : IHostedService, IDisposable
         {
             _logger.LogInformation(
                 "FastSTRM: Playback of {Name} stopped, cancelling its background probe",
-                item.Name);
+                LogSafe.Name(item, MaxLoggedNameLength));
         }
     }
 
@@ -353,7 +449,7 @@ public sealed class ProbeService : IHostedService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "FastSTRM: Unable to inspect playback sessions for {Name}", item.Name);
+            _logger.LogDebug(ex, "FastSTRM: Unable to inspect playback sessions for {Name}", LogSafe.Name(item, MaxLoggedNameLength));
             return false;
         }
     }
@@ -385,21 +481,68 @@ public sealed class ProbeService : IHostedService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "FastSTRM: Unable to inspect playback sessions for {Name}", item.Name);
+            _logger.LogDebug(ex, "FastSTRM: Unable to inspect playback sessions for {Name}", LogSafe.Name(item, MaxLoggedNameLength));
             return false;
         }
     }
 
     // ── Public API ──
 
+    /// <summary>Incremental probe mode: only items without stream info.</summary>
+    public const string IncrementalMode = "Incremental";
+
+    /// <summary>Full probe mode: every .strm item.</summary>
+    public const string FullMode = "Full";
+
     /// <summary>
-    /// Returns a summary of .strm items in the library.
+    /// Normalizes a probe mode. Unknown values are rejected instead of silently falling back to
+    /// a full-library probe, so a typo cannot trigger an expensive rescan.
     /// </summary>
-    public (int Total, int Probed, int Unprobed) GetSummary()
+    public static bool TryParseMode(string? mode, out string normalized)
     {
-        var items = GetStrmItems();
-        int probed = items.Count(HasStreamInfo);
-        return (items.Count, probed, items.Count - probed);
+        normalized = FullMode;
+        if (string.Equals(mode, FullMode, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(mode)
+            || string.Equals(mode, IncrementalMode, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = IncrementalMode;
+            return true;
+        }
+
+        // Leave the caller with the cheapest mode so an invalid value never triggers a rescan.
+        normalized = IncrementalMode;
+        return false;
+    }
+
+    /// <summary>
+    /// Returns a summary of .strm items in the library. The result is cached for
+    /// <see cref="SummaryCacheTtl"/> because computing it scans the whole video library.
+    /// </summary>
+    /// <param name="forceRefresh">Bypasses the cache, e.g. right after a probe finished.</param>
+    public (int Total, int Probed, int Unprobed) GetSummary(bool forceRefresh = false)
+    {
+        lock (_summaryLock)
+        {
+            var now = DateTime.UtcNow;
+            var ageTicks = now.Ticks - _summaryCacheUtcTicks;
+            if (!forceRefresh
+                && _summaryCacheUtcTicks != 0
+                && ageTicks >= 0
+                && ageTicks < SummaryCacheTtl.Ticks)
+            {
+                return _summaryCache;
+            }
+
+            var items = GetStrmItems();
+            var probed = items.Count(HasStreamInfo);
+            _summaryCache = (items.Count, probed, items.Count - probed);
+            _summaryCacheUtcTicks = now.Ticks;
+            return _summaryCache;
+        }
     }
 
     /// <summary>
@@ -408,6 +551,13 @@ public sealed class ProbeService : IHostedService, IDisposable
     /// <param name="mode">"Incremental" or "Full".</param>
     public bool StartProbe(string mode)
     {
+        if (!TryParseMode(mode, out var normalizedMode))
+        {
+            return false;
+        }
+
+        CancellationTokenSource cts;
+        int generation;
         lock (_lock)
         {
             // "Stopping" must also block a new start: the previous task is still winding down and
@@ -417,23 +567,55 @@ public sealed class ProbeService : IHostedService, IDisposable
                 return false;
             }
 
-            var items = GetStrmItems();
-            if (string.Equals(mode, "Incremental", StringComparison.OrdinalIgnoreCase))
+            // Reserve the slot before the (potentially slow) library scan. Holding _lock while
+            // enumerating the library used to block StopProbe and the task's own finally block
+            // for seconds on a large library.
+            State = "Running";
+            Volatile.Write(ref _totalItems, 0);
+            Volatile.Write(ref _processedItems, 0);
+            CurrentItemName = string.Empty;
+
+            cts = new CancellationTokenSource();
+            _cts = cts;
+            generation = ++_probeGeneration;
+        }
+
+        // The scan runs inside the probe task, outside the lock; a cancellation (StopProbe) or a
+        // scan failure is handled there, and RunProbeAsync's finally block releases the slot.
+        Task probeTask;
+        try
+        {
+            probeTask = Task.Run(() => RunProbeAsync(normalizedMode, cts, generation));
+        }
+        catch (Exception ex)
+        {
+            // Nothing will ever run, so release the slot we reserved instead of leaving the
+            // service stuck in "Running" with no task behind it.
+            lock (_lock)
             {
-                items = items.Where(i => !HasStreamInfo(i)).ToList();
+                if (generation == _probeGeneration)
+                {
+                    State = "Idle";
+                    _cts = null;
+                    _probeTask = null;
+                }
             }
 
-            TotalItems = items.Count;
-            ProcessedItems = 0;
-            CurrentItemName = string.Empty;
-            State = "Running";
-
-            var cts = new CancellationTokenSource();
-            _cts = cts;
-            var generation = ++_probeGeneration;
-            _probeTask = Task.Run(() => RunProbeAsync(items, cts, generation));
-            return true;
+            cts.Dispose();
+            _logger.LogError(ex, "FastSTRM: Unable to start the probe task");
+            return false;
         }
+
+        lock (_lock)
+        {
+            if (generation == _probeGeneration)
+            {
+                // Do not keep a completed task: the run may have finished before it was stored.
+                _probeTask = probeTask.IsCompleted ? null : probeTask;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -532,7 +714,7 @@ public sealed class ProbeService : IHostedService, IDisposable
                 cts.Dispose();
             }
 
-            _logger.LogDebug(ex, "FastSTRM: Unable to schedule a background probe for {Name}", item.Name);
+            _logger.LogDebug(ex, "FastSTRM: Unable to schedule a background probe for {Name}", LogSafe.Name(item, MaxLoggedNameLength));
         }
     }
 
@@ -547,12 +729,12 @@ public sealed class ProbeService : IHostedService, IDisposable
 
             _logger.LogInformation(
                 "FastSTRM: Playback started before {Name} was probed, filling in duration in the background so playback progress can be tracked",
-                item.Name);
+                LogSafe.Name(item, MaxLoggedNameLength));
 
             _logger.LogDebug(
                 "FastSTRM: Waiting {Delay}s before probing {Name} so the probe does not compete with the player opening the same stream",
                 (int)initialDelay.TotalSeconds,
-                item.Name);
+                LogSafe.Name(item, MaxLoggedNameLength));
 
             await Task.Delay(initialDelay, token).ConfigureAwait(false);
 
@@ -563,7 +745,7 @@ public sealed class ProbeService : IHostedService, IDisposable
                     // A batch probe is running and already covers every unprobed item.
                     _logger.LogDebug(
                         "FastSTRM: Dropping background probe of {Name} because a batch probe is running",
-                        item.Name);
+                        LogSafe.Name(item, MaxLoggedNameLength));
                     return;
                 }
 
@@ -574,13 +756,21 @@ public sealed class ProbeService : IHostedService, IDisposable
                     _lastPlaybackProbeAttemptUtc.TryRemove(item.Id, out _);
                     _logger.LogInformation(
                         "FastSTRM: Playback of {Name} has stopped, skipping the background probe",
-                        item.Name);
+                        LogSafe.Name(item, MaxLoggedNameLength));
                     return;
                 }
 
                 // A failed probe does not throw: Jellyfin logs the provider error and lets the
                 // refresh finish, so the runtime is the only reliable success signal.
-                await ProbeItemAsync(item, token).ConfigureAwait(false);
+                var gate = await AcquireProbeSlotAsync(token).ConfigureAwait(false);
+                try
+                {
+                    await ProbeItemAsync(item, token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    ReleaseProbeSlot(gate);
+                }
 
                 var probedRuntimeTicks = GetProbedRuntimeTicks(item);
                 if (probedRuntimeTicks is > 0)
@@ -591,7 +781,7 @@ public sealed class ProbeService : IHostedService, IDisposable
 
                     _logger.LogInformation(
                         "FastSTRM: Background probe of {Name} finished (RunTimeTicks={RunTimeTicks})",
-                        item.Name,
+                        LogSafe.Name(item, MaxLoggedNameLength),
                         probedRuntimeTicks);
                     return;
                 }
@@ -602,7 +792,7 @@ public sealed class ProbeService : IHostedService, IDisposable
                         "FastSTRM: Background probe of {Name} produced no stream info after {Attempts} attempt(s) "
                         + "(RunTimeTicks=null). Playback and progress tracking are unaffected; the next playback "
                         + "retries it, at most once every {Interval}",
-                        item.Name,
+                        LogSafe.Name(item, MaxLoggedNameLength),
                         attempt + 1,
                         PlaybackProbeRetryInterval);
                     return;
@@ -612,7 +802,7 @@ public sealed class ProbeService : IHostedService, IDisposable
                 _logger.LogWarning(
                     "FastSTRM: Background probe of {Name} produced no stream info (RunTimeTicks=null); "
                     + "retrying in {Delay}s (retry {Retry}/{MaxRetries})",
-                    item.Name,
+                    LogSafe.Name(item, MaxLoggedNameLength),
                     (int)retryDelay.TotalSeconds,
                     attempt + 1,
                     PlaybackProbeRetryDelays.Length);
@@ -624,11 +814,11 @@ public sealed class ProbeService : IHostedService, IDisposable
         {
             _logger.LogDebug(
                 "FastSTRM: Background probe of {Name} was cancelled because playback stopped or the server is shutting down",
-                item.Name);
+                LogSafe.Name(item, MaxLoggedNameLength));
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "FastSTRM: Background playback probe failed for {Name}", item.Name);
+            _logger.LogWarning(ex, "FastSTRM: Background playback probe failed for {Name}", LogSafe.Name(item, MaxLoggedNameLength));
         }
         finally
         {
@@ -643,38 +833,71 @@ public sealed class ProbeService : IHostedService, IDisposable
 
     // ── Internal ──
 
-    private async Task RunProbeAsync(List<BaseItem> items, CancellationTokenSource cts, int generation)
+    private async Task RunProbeAsync(string mode, CancellationTokenSource cts, int generation)
     {
         var ct = cts.Token;
 
         try
         {
-            foreach (var item in items)
+            // The library scan stays off the caller's lock: on a large library it takes seconds
+            // and would otherwise block StopProbe and this task's own finally block.
+            var items = GetStrmItems();
+            if (string.Equals(mode, IncrementalMode, StringComparison.OrdinalIgnoreCase))
             {
-                if (ct.IsCancellationRequested)
-                {
-                    break;
-                }
+                items = items.Where(i => !HasStreamInfo(i)).ToList();
+            }
 
-                CurrentItemName = item.Name ?? item.Path ?? string.Empty;
-                _logger.LogInformation("FastSTRM: Probing [{Index}/{Total}] {Name}",
-                    ProcessedItems + 1, TotalItems, CurrentItemName);
+            lock (_lock)
+            {
+                // Only the run that still owns the state may publish its item count.
+                if (generation == _probeGeneration)
+                {
+                    Volatile.Write(ref _totalItems, items.Count);
+                }
+            }
+
+            var total = items.Count;
+            var limit = GetConfiguredProbeLimit();
+            var probeIndex = 0;
+            Volatile.Write(ref _lastProgressLogTicks, 0);
+
+            var options = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = limit,
+                CancellationToken = ct
+            };
+
+            await Parallel.ForEachAsync(items, options, async (item, token) =>
+            {
+                var gate = await AcquireProbeSlotAsync(token).ConfigureAwait(false);
+                var name = LogSafe.Name(item, MaxDisplayedNameLength);
 
                 try
                 {
-                    await ProbeItemAsync(item, ct).ConfigureAwait(false);
+                    var index = Interlocked.Increment(ref probeIndex);
+                    CurrentItemName = name;
+                    LogProgress(index, total, name);
+
+                    await ProbeItemAsync(item, token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
-                    break;
+                    return;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "FastSTRM: Probe failed for {Name}, skipping", CurrentItemName);
+                    _logger.LogWarning(ex, "FastSTRM: Probe failed for {Name}, skipping", name);
+                }
+                finally
+                {
+                    ReleaseProbeSlot(gate);
                 }
 
-                ProcessedItems++;
-            }
+                Interlocked.Increment(ref _processedItems);
+            }).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {
@@ -704,6 +927,52 @@ public sealed class ProbeService : IHostedService, IDisposable
     /// Triggers the official Jellyfin metadata refresh with remote content probing
     /// for a single item. This writes real probe data into the database.
     /// </summary>
+    private void LogProgress(int index, int total, string name)
+    {
+        var now = DateTime.UtcNow.Ticks;
+        var last = Interlocked.Read(ref _lastProgressLogTicks);
+        if (index != 1 && index != total && now - last < ProgressLogInterval.Ticks)
+        {
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _lastProgressLogTicks, now, last) != last)
+        {
+            return;
+        }
+
+        _logger.LogInformation("FastSTRM: Probing [{Index}/{Total}] {Name}", index, total, name);
+    }
+
+    private static int GetConfiguredProbeLimit()
+        => Plugin.Instance?.Configuration.GetMaxConcurrentProbes() ?? PluginConfiguration.MinConcurrentProbes;
+
+    private async Task<SemaphoreSlim> AcquireProbeSlotAsync(CancellationToken cancellationToken)
+    {
+        SemaphoreSlim gate;
+        lock (_probeGateLock)
+        {
+            var limit = GetConfiguredProbeLimit();
+            if (limit != _probeGateLimit && Volatile.Read(ref _activeProbes) == 0)
+            {
+                _probeGate = new SemaphoreSlim(limit, limit);
+                _probeGateLimit = limit;
+            }
+
+            gate = _probeGate;
+        }
+
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Interlocked.Increment(ref _activeProbes);
+        return gate;
+    }
+
+    private void ReleaseProbeSlot(SemaphoreSlim gate)
+    {
+        Interlocked.Decrement(ref _activeProbes);
+        gate.Release();
+    }
+
     private async Task ProbeItemAsync(BaseItem item, CancellationToken ct)
     {
         await item.RefreshMetadata(
@@ -738,10 +1007,25 @@ public sealed class ProbeService : IHostedService, IDisposable
     /// Keeps the playback-probe attempt map bounded. Entries are only needed for the retry
     /// throttle window, so anything older is dead. If a very large library still exceeds the
     /// bound inside the window, the oldest record is dropped to guarantee the bound.
+    /// The whole pass is a full scan of up to <see cref="MaxTrackedPlaybackAttempts"/> entries
+    /// and is reached from every playback progress report, so it runs at most once per
+    /// <see cref="PruneInterval"/>.
     /// </summary>
     private void PrunePlaybackProbeAttempts(DateTime now)
     {
         if (_lastPlaybackProbeAttemptUtc.Count < MaxTrackedPlaybackAttempts)
+        {
+            return;
+        }
+
+        var lastPruneTicks = Interlocked.Read(ref _lastPruneUtcTicks);
+        if (now.Ticks - lastPruneTicks < PruneInterval.Ticks)
+        {
+            return;
+        }
+
+        // Only one reporter per interval does the scan; the others return immediately.
+        if (Interlocked.CompareExchange(ref _lastPruneUtcTicks, now.Ticks, lastPruneTicks) != lastPruneTicks)
         {
             return;
         }
@@ -796,7 +1080,7 @@ public sealed class ProbeService : IHostedService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "FastSTRM: Unable to re-read {Name} after probing", item.Name);
+            _logger.LogDebug(ex, "FastSTRM: Unable to re-read {Name} after probing", LogSafe.Name(item, MaxLoggedNameLength));
             return null;
         }
     }
@@ -818,8 +1102,39 @@ public sealed class ProbeService : IHostedService, IDisposable
 
         StopProbe();
 
+        // Cancel the remaining per-item probes so a pending delay or ffprobe stops promptly.
+        // A source whose task is still alive is released by that task's own finally block;
+        // disposing it here would make the task's next Token/Register call throw.
+        foreach (var pair in _playbackProbeCancellation)
+        {
+            if (_playbackProbeTasks.ContainsKey(pair.Key))
+            {
+                try
+                {
+                    pair.Value.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // The owning task already finished and disposed it.
+                }
+                catch (AggregateException)
+                {
+                    // One of the registered callbacks failed; nothing left to do at shutdown.
+                }
+            }
+            else if (_playbackProbeCancellation.TryRemove(pair.Key, out var orphan))
+            {
+                // No task owns it anymore, so nobody else will dispose it.
+                orphan.Dispose();
+            }
+        }
+
         // The batch probe task owns _cts and disposes it in RunProbeAsync's finally block.
         // Disposing it here could race with a running RefreshMetadata call.
         _shutdownCts?.Dispose();
+
+        // _probeGate is intentionally not disposed: a queued probe may still be waiting on it,
+        // and disposing it underneath that waiter would throw instead of cancelling cleanly
+        // (the shutdown token above already unblocks them).
     }
 }

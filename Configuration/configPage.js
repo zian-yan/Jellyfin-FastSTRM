@@ -14,6 +14,7 @@ export default function (view) {
     var progressBar = view.querySelector('#probeProgressBar');
     var lblCurrentItem = view.querySelector('#lblCurrentItem');
     var chkAutoProbe = view.querySelector('#chkEnableAutoProbe');
+    var txtProbeConcurrency = view.querySelector('#txtProbeConcurrency');
     var chkSkipProbeForUnprobed = view.querySelector('#chkSkipProbeForUnprobedStrm');
     var selectUnprobedPlaybackMode = view.querySelector('#selectUnprobedPlaybackMode');
     var txtBackgroundProbeDelay = view.querySelector('#txtBackgroundProbeDelay');
@@ -43,6 +44,14 @@ export default function (view) {
         return Math.min(3600, Math.max(0, seconds));
     }
 
+    function clampConcurrency(value) {
+        var limit = parseInt(value, 10);
+        if (isNaN(limit)) {
+            return 1;
+        }
+        return Math.min(16, Math.max(1, limit));
+    }
+
     // 下拉框、延迟与停止策略只在“跳过探测”开启时可用；后两者只在“后台补探测”模式下可用。
     function updateUnprobedPlaybackState() {
         var instantPlayback = chkSkipProbeForUnprobed.checked;
@@ -57,11 +66,14 @@ export default function (view) {
 
     // ── Data loading ──
 
-    function loadSummary() {
-        apiGet('FastStrm/Summary').then(function (data) {
+    function loadSummary(forceRefresh) {
+        return apiGet('FastStrm/Summary' + (forceRefresh ? '?refresh=true' : '')).then(function (data) {
             lblTotal.textContent = data.Total;
             lblProbed.textContent = data.Probed;
             lblUnprobed.textContent = data.Unprobed;
+        }).catch(function () {
+            // The summary is a whole-library scan on the server; a transient failure only means
+            // the counters stay as they are, so do not surface it as an unhandled rejection.
         });
     }
 
@@ -82,7 +94,8 @@ export default function (view) {
                 btnStart.style.display = 'inline-flex';
                 btnStop.style.display = 'none';
                 stopPolling();
-                loadSummary();
+                // A run just ended, so the cached counters on the server are stale.
+                loadSummary(true);
             }
         });
     }
@@ -91,6 +104,7 @@ export default function (view) {
         ApiClient.getPluginConfiguration(pluginId).then(function (config) {
             chkAutoProbe.checked = config.EnableAutoProbe;
             // 默认值为 true：旧配置文件中没有该字段时也保持"跳过探测"的极速模式
+            txtProbeConcurrency.value = clampConcurrency(config.MaxConcurrentProbes);
             chkSkipProbeForUnprobed.checked = config.SkipProbeForUnprobedStrm !== false;
             // 默认不补探测：旧配置文件中没有该字段时按“直接起播，不补探测”处理
             selectUnprobedPlaybackMode.value = config.EnableBackgroundProbeForUnprobedStrm === true
@@ -138,14 +152,19 @@ export default function (view) {
     // ── Event handlers ──
 
     btnStart.addEventListener('click', function () {
-        apiPost('FastStrm/Probe/Start?mode=' + selectMode.value).then(function () {
+        apiPost('FastStrm/Probe/Start?mode=' + encodeURIComponent(selectMode.value)).then(function () {
             loadStatus();
+        }).catch(function () {
+            // A rejected start (409 while another run is winding down) leaves the buttons as-is;
+            // the next status poll corrects them.
         });
     });
 
     btnStop.addEventListener('click', function () {
         apiPost('FastStrm/Probe/Stop').then(function () {
             loadStatus();
+        }).catch(function () {
+            // Ignore: the status poll still reflects the real server state.
         });
     });
 
@@ -157,7 +176,9 @@ export default function (view) {
             config.EnableBackgroundProbeForUnprobedStrm = selectUnprobedPlaybackMode.value === 'Background';
             config.BackgroundProbeDelaySeconds = clampDelaySeconds(txtBackgroundProbeDelay.value);
             config.CancelBackgroundProbeOnPlaybackStop = chkCancelProbeOnPlaybackStop.checked;
+            config.MaxConcurrentProbes = clampConcurrency(txtProbeConcurrency.value);
             txtBackgroundProbeDelay.value = config.BackgroundProbeDelaySeconds;
+            txtProbeConcurrency.value = config.MaxConcurrentProbes;
             ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                 Dashboard.processPluginConfigurationUpdateResult();
             });

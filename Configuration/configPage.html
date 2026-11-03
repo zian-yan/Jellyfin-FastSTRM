@@ -67,6 +67,13 @@
         <!-- 配置表单区 -->
         <form class="fastStrmConfigurationForm">
             <div class="verticalSection verticalSection-extrabottompadding">
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="txtProbeConcurrency">探测并发数</label>
+                    <input is="emby-input" type="number" id="txtProbeConcurrency" min="1" max="16" step="1" value="1" />
+                    <div class="fieldDescription">
+                        增量探测、全量探测、入库自动探测与补探测统一使用该并发数，默认 1，范围 1–16。
+                    </div>
+                </div>
                 <div class="checkboxContainer checkboxContainer-anonymouscheckbox">
                     <label>
                         <input is="emby-checkbox" type="checkbox" id="chkEnableAutoProbe" />

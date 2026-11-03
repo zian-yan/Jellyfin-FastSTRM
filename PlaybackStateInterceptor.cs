@@ -147,14 +147,14 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
                         _logger.LogInformation(
                             "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; probing in background so completion can be tracked",
                             reportedPositionTicks.Value,
-                            item.Name);
+                            LogSafe.Name(item));
                     }
                     else
                     {
                         _logger.LogInformation(
                             "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; background probing is disabled, so completion cannot be tracked until a probe runs",
                             reportedPositionTicks.Value,
-                            item.Name);
+                            LogSafe.Name(item));
                     }
                 }
             }
@@ -189,7 +189,7 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "FastSTRM: Unable to schedule a background probe for {Name}", item.Name);
+            _logger.LogDebug(ex, "FastSTRM: Unable to schedule a background probe for {Name}", LogSafe.Name(item));
         }
     }
 

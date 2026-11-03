@@ -21,10 +21,11 @@ public class FastStrmController : ControllerBase
     /// <summary>
     /// Returns a summary of .strm items in the library.
     /// </summary>
+    /// <param name="refresh">Bypasses the 30s cache, e.g. right after a probe finished.</param>
     [HttpGet("Summary")]
-    public ActionResult GetSummary()
+    public ActionResult GetSummary([FromQuery] bool refresh = false)
     {
-        var (total, probed, unprobed) = _probeService.GetSummary();
+        var (total, probed, unprobed) = _probeService.GetSummary(refresh);
         var config = Plugin.Instance?.Configuration;
         return Ok(new
         {
@@ -42,9 +43,18 @@ public class FastStrmController : ControllerBase
     /// Starts a probe task. Mode: "Incremental" or "Full".
     /// </summary>
     [HttpPost("Probe/Start")]
-    public ActionResult StartProbe([FromQuery] string mode = "Incremental")
+    public ActionResult StartProbe([FromQuery] string mode = ProbeService.IncrementalMode)
     {
-        if (_probeService.StartProbe(mode))
+        // Reject unknown modes instead of letting them fall through to a full-library rescan.
+        if (!ProbeService.TryParseMode(mode, out var normalizedMode))
+        {
+            return BadRequest(new
+            {
+                Message = $"Unsupported mode '{mode}'. Use '{ProbeService.IncrementalMode}' or '{ProbeService.FullMode}'."
+            });
+        }
+
+        if (_probeService.StartProbe(normalizedMode))
         {
             return NoContent();
         }

@@ -97,7 +97,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
         {
             _logger.LogDebug(
                 "FastSTRM: Unprobed .strm, falling back to the official media probe for {Name}",
-                item.Name);
+                LogSafe.Name(item));
 
             return await _inner.GetPlaybackMediaSources(
                 item, user, allowMediaProbe, enablePathSubstitution, cancellationToken)
@@ -106,7 +106,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
 
         _logger.LogDebug(
             "FastSTRM: Skipping ffprobe for {Name} (HasStreamInfo={HasStreamInfo})",
-            item.Name,
+            LogSafe.Name(item),
             hasStreamInfo);
 
         var sources = await _inner.GetPlaybackMediaSources(
@@ -136,7 +136,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "FastSTRM: Unable to schedule a background probe for {Name}", item.Name);
+            _logger.LogDebug(ex, "FastSTRM: Unable to schedule a background probe for {Name}", LogSafe.Name(item));
         }
     }
 
@@ -188,7 +188,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
             _logger.LogWarning(
                 "FastSTRM: {Name} has no stream info and probing was skipped for instant playback. "
                 + "Playback progress is kept; a background probe in {Delay}s fills in the duration/track information.",
-                item.Name,
+                LogSafe.Name(item),
                 backgroundProbeDelaySeconds.Value);
             return;
         }
@@ -197,7 +197,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
             "FastSTRM: {Name} has no stream info and probing was skipped for instant playback. "
             + "Playback progress is kept, but background probing is disabled, so the duration/track "
             + "information stays unavailable until a probe runs (enable background probing or run an incremental probe).",
-            item.Name);
+            LogSafe.Name(item));
     }
 
     // ── All remaining members: 100% delegation to _inner ──
