@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/main/images/faststrm-banner.png",
     "versions": [
       {
+        "version": "3.3.3.0",
+        "changelog": "### ✨ 新增\n\n- 新增 **探测并发数** 配置项（1–16，默认 **1**）：增量、全量、入库自动与起播补探测共用同一并发闸门，批量探测按并发数并行处理。\n- `GET /FastStrm/Summary` 支持 `refresh=true` 强制刷新，库概览结果默认缓存 30 秒。\n\n### 💬 优化\n\n- 启动探测不再持锁扫描全库：锁内只占位，扫描移入探测任务，停止探测不再被阻塞。\n- 日志中的条目名称统一替换控制字符并截断（日志 120 字符 / 界面 200 字符），避免异常文件名伪造日志行或撑大日志。\n- 全量探测进度日志改为按时间节流，播放标记缓存的清理最多每分钟一次。\n\n### 🐛 修复\n\n- `POST /FastStrm/Probe/Start` 传入非法 `mode` 现在返回 400，不再静默退化为全库探测。\n- 释放残留的单条探测取消源，避免重复入库事件堆积。\n- 配置页请求补齐异常处理，探测结束后强制刷新计数。\n\n---",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/zian-yan/Jellyfin-FastSTRM/releases/download/v3.3.3/FastSTRM.zip",
+        "checksum": "d2ef2df5c882779428b417d38f2bbec1",
+        "timestamp": "2026-11-03T18:30:22Z"
+      },
+      {
         "version": "3.3.2.0",
         "changelog": "### 🐛 修复\n\n- 修复播放标记缓存只增不减导致的长期内存增长（探测成功后回收并加上限）。\n- 修复批量探测在「停止中」可重复启动、关闭时未等待任务，以及入库自动探测重复/不可取消的问题。\n- 修复多会话停止误取消补探测、装饰器误释放容器共享实例，以及配置页离开后轮询被在途请求重新拉起的问题。\n\n---",
         "targetAbi": "12.0.0.0",
