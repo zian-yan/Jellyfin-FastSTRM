@@ -13,3 +13,6 @@
 # OS Generated
 .DS_Store
 Thumbs.db
+
+# Local tooling / assistant workspace data
+.workbuddy/
