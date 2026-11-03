@@ -104,18 +104,6 @@ dotnet build -c Release
 
 ---
 
-### 配置项
-
-| 界面名称 | 配置字段 | 默认 | 作用 |
-| :--- | :--- | :--- | :--- |
-| Strm 入库自动探测 | `EnableAutoProbe` | 关 | 新入库的无流 `.strm` 自动后台探测 |
-| 未探测的 STRM 文件也跳过探测 | `SkipProbeForUnprobedStrm` | **开** | 开：无流条目跳过 ffprobe 秒开；关：回退官方探测 |
-| 起播后策略 | `EnableBackgroundProbeForUnprobedStrm` | 关 | 仅在上一项开启时生效；开：秒开后补探测；关：不再请求流地址 |
-| 补探测延迟（秒） | `BackgroundProbeDelaySeconds` | 5 | 起播到补探测的间隔，0–3600 |
-| 播放停止后取消补探测 | `CancelBackgroundProbeOnPlaybackStop` | 开 | 关：播放停止后仍继续补探测 |
-
----
-
 ## API
 
 需管理员权限 Token 或已登录会话。
