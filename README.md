@@ -101,11 +101,11 @@ dotnet build -c Release
 
 3. 保存后在「插件 → 目录」搜索 `FastSTRM` 安装。
 
-若 `raw.githubusercontent.com` 访问不稳定，可改用 jsDelivr 镜像（缓存约 12 小时）：
+    若 `raw.githubusercontent.com` 访问不稳定，可改用 jsDelivr 镜像（缓存约 12 小时）：
 
-```text
-https://cdn.jsdelivr.net/gh/zian-yan/Jellyfin-FastSTRM@main/manifest.json
-```
+    ```text
+    https://cdn.jsdelivr.net/gh/zian-yan/Jellyfin-FastSTRM@main/manifest.json
+    ```
 
 ## English
 
