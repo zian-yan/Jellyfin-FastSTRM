@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FastSTRM.Configuration;
+using FastSTRM.Playback;
+using FastSTRM.Probing;
 using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;

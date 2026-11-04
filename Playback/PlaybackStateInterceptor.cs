@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using FastSTRM.Common;
+using FastSTRM.Probing;
 using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
@@ -12,7 +14,7 @@ using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace FastSTRM;
+namespace FastSTRM.Playback;
 
 /// <summary>
 /// Decorator around <see cref="IUserDataManager"/> that keeps playback progress for .strm

@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using FastSTRM.Playback;
+using FastSTRM.Probing;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;

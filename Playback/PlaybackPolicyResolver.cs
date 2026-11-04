@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using FastSTRM.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace FastSTRM;
+namespace FastSTRM.Playback;
 
 /// <summary>
 /// 解析「某个用户当前应该用哪套播放策略」。

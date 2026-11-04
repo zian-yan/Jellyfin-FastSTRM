@@ -26,6 +26,26 @@ FastSTRM 以装饰器方式包裹 Jellyfin 的 `IMediaSourceManager` 与 `IUserD
 
 ---
 
+## 项目结构
+
+源码按模块分目录，**目录名与命名空间一一对应**（`Playback/` → `FastSTRM.Playback`）：
+
+```
+FastSTRM.csproj
+├── Plugin.cs                     插件入口（BasePlugin + 配置页注册），命名空间 FastSTRM
+├── PluginServiceRegistrator.cs   DI 组合根：装饰器与服务注册
+├── Api/                          管理接口（/FastStrm/*）
+├── Configuration/                配置契约（XML 持久化）与配置页静态资源
+├── Playback/                     播放链路：策略解析 + 两个装饰器
+├── Probing/                      后台探测服务（全库预探测 / 入库探测 / 起播补探测）
+└── Common/                       跨模块共享工具（日志脱敏）
+```
+
+> 配置页 `configPage.html` / `configPage.js` 以**嵌入资源**打包，资源名由「根命名空间 + 目录路径」决定。
+> 移动 `Configuration/` 目录或改变 `Plugin` 所在命名空间时，必须同步 `Plugin.GetPages()` 里的 `EmbeddedResourcePath`。
+
+---
+
 ## 核心概念：有流与无流
 
 插件不根据文件本身判断，而是根据**数据库里是否已有该条目的流信息**分流。判定依据是 `RunTimeTicks`：

@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using MediaBrowser.Controller.Entities;
 
-namespace FastSTRM;
+namespace FastSTRM.Common;
 
 /// <summary>
 /// Renders item names for log messages and the UI.

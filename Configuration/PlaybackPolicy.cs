@@ -8,7 +8,7 @@ namespace FastSTRM.Configuration;
 /// <remarks>
 /// 策略模式以**字符串**持久化（插件 XML 配置与配置页 JSON 都保持可读），而不是枚举：
 /// XML 反序列化会把无法识别的枚举值静默变成 0（即「继承」），管理员写错一个字母也无从发现。
-/// 字符串原样保留非法值，交给 <see cref="PlaybackPolicyResolver"/> 判定为无效并回退，
+/// 字符串原样保留非法值，交给 <see cref="FastSTRM.Playback.PlaybackPolicyResolver"/> 判定为无效并回退，
 /// 同时在日志与 API 中给出明确原因。
 /// </remarks>
 public static class PlaybackPolicyMode

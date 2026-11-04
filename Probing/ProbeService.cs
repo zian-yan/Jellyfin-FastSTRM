@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using FastSTRM.Common;
 using FastSTRM.Configuration;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
@@ -14,7 +15,7 @@ using MediaBrowser.Controller.Session;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace FastSTRM;
+namespace FastSTRM.Probing;
 
 /// <summary>
 /// Background service that provides library-wide .strm pre-probing
