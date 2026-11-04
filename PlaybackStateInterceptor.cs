@@ -6,6 +6,7 @@ using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +40,16 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
     private readonly IUserDataManager _inner;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<PlaybackStateInterceptor> _logger;
+    private readonly PlaybackPolicyResolver _policyResolver;
+
+    /// <summary>
+    /// Resolved on first use instead of being injected: Jellyfin's session manager itself depends
+    /// on <see cref="IUserDataManager"/>, so injecting it here would make the container resolve the
+    /// decorator while constructing its own constructor argument (a circular dependency).
+    /// By the time playback progress is reported the container is fully built, so the lookup
+    /// returns the already-constructed singleton.
+    /// </summary>
+    private ISessionManager? _sessionManager;
 
     /// <summary>
     /// Whether this decorator is the only owner of <see cref="_inner"/>. An instance that came
@@ -56,11 +67,13 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
         IUserDataManager inner,
         IServiceProvider serviceProvider,
         ILogger<PlaybackStateInterceptor> logger,
+        PlaybackPolicyResolver policyResolver,
         bool disposeInner)
     {
         _inner = inner;
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _policyResolver = policyResolver;
         _disposeInner = disposeInner;
     }
 
@@ -123,14 +136,15 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
         {
             data.PlaybackPositionTicks = reportedPositionTicks.Value;
 
-            // The administrator decides whether an instantly-started, unprobed item is also
-            // probed in the background. When it is disabled, keep the position but never touch
-            // the stream endpoint a second time. The official-probe fallback (skip disabled)
-            // handles probing itself, so no background probe is scheduled in that mode either.
-            var backgroundProbeDelaySeconds = Plugin.Instance?.Configuration
-                is { SkipProbeForUnprobedStrm: true, EnableBackgroundProbeForUnprobedStrm: true } config
-                    ? config.GetBackgroundProbeDelaySeconds()
-                    : (int?)null;
+            // 补探测是否调度沿用播放者自己的生效策略（用户级优先，未配置继承全局）。
+            // UpdatePlayState 不带用户参数，因此从正在播放该条目的会话反查用户；
+            // 查不到会话（例如手动标记已看）时按全局策略处理。
+            // The official-probe fallback (skip disabled) handles probing itself, so no background
+            // probe is scheduled in that mode either.
+            var policy = _policyResolver.Resolve(ResolvePlayingUserId(item));
+            var backgroundProbeDelaySeconds = policy.ShouldProbeInBackground
+                ? policy.BackgroundProbeDelaySeconds
+                : (int?)null;
 
             if (reportedPositionTicks.Value > 0)
             {
@@ -152,7 +166,7 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
                     else
                     {
                         _logger.LogInformation(
-                            "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; background probing is disabled, so completion cannot be tracked until a probe runs",
+                            "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; background probing is disabled for this user's playback policy, so completion cannot be tracked until a probe runs",
                             reportedPositionTicks.Value,
                             LogSafe.Name(item));
                     }
@@ -180,6 +194,52 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
 
     private static bool HasKnownRuntime(BaseItem item)
         => item.RunTimeTicks.HasValue && item.RunTimeTicks.Value > 0;
+
+    /// <summary>
+    /// Finds which user is playing <paramref name="item"/>, so the per-user playback policy can be
+    /// applied on the progress-report path as well.
+    /// </summary>
+    /// <returns>
+    /// The user id, or <c>null</c> when no session is playing the item or session information is
+    /// unavailable. The caller then uses the global policy — a probe decision must never depend on
+    /// a guess about which user is playing.
+    /// </returns>
+    /// <remarks>
+    /// <see cref="IUserDataManager.UpdatePlayState"/> has no user parameter and
+    /// <c>UserItemData</c> carries no user id, so the session is the only reliable source.
+    /// Two users playing the same item at the same time resolve to the first matching session;
+    /// the item is probed at most once anyway, so the difference is only whether a background
+    /// probe is scheduled for this particular item.
+    /// </remarks>
+    private Guid? ResolvePlayingUserId(BaseItem item)
+    {
+        try
+        {
+            var sessionManager = _sessionManager
+                ??= _serviceProvider.GetService<ISessionManager>();
+
+            if (sessionManager is null)
+            {
+                return null;
+            }
+
+            foreach (var session in sessionManager.Sessions)
+            {
+                if (session.NowPlayingItem is not null
+                    && session.NowPlayingItem.Id == item.Id
+                    && session.UserId != Guid.Empty)
+                {
+                    return session.UserId;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "FastSTRM: Unable to resolve the playing user for {Name}", LogSafe.Name(item));
+        }
+
+        return null;
+    }
 
     private void ScheduleBackgroundProbe(BaseItem item, int delaySeconds)
     {

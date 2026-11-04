@@ -122,6 +122,54 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 按用户播放策略 -->
+                <div id="userPlaybackPolicySection" style="margin-top: 1.6em; padding-top: 1.4em; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 1em; flex-wrap: wrap;">
+                        <h3 style="margin: 0; font-size: 1.05em; font-weight: 600;">按用户播放策略</h3>
+                        <span id="lblUserPolicySummary" style="font-size: 0.8em; color: #888;">-</span>
+                    </div>
+
+                    <div class="fieldDescription" style="margin-top: 0.5em;">
+                        用户级配置优先于上方全局配置；未在此列出的用户继承全局策略。
+                        策略在每次播放请求时读取，保存后对下一次播放生效，不影响正在播放的会话。
+                    </div>
+
+                    <div id="userPolicyEmpty" style="margin-top: 0.9em; font-size: 0.85em; color: #777;">
+                        暂无用户级配置，所有用户继承全局策略。
+                    </div>
+
+                    <div id="userPolicyRows" style="display: flex; flex-direction: column; gap: 0.55em; margin-top: 0.9em;"></div>
+
+                    <div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 0.9fr) auto; gap: 0.6em; align-items: end; margin-top: 1.1em; padding-top: 1em; border-top: 1px dashed rgba(255, 255, 255, 0.1);">
+                        <div style="min-width: 0;">
+                            <label class="inputLabel inputLabelUnfocused" for="selectAddUserPolicyUser" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;">用户</label>
+                            <select class="emby-select" id="selectAddUserPolicyUser" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;"></select>
+                        </div>
+                        <div style="min-width: 0;">
+                            <label class="inputLabel inputLabelUnfocused" for="selectAddUserPolicyMode" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;">播放策略</label>
+                            <select class="emby-select" id="selectAddUserPolicyMode" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;">
+                                <option value="InstantNoProbe">跳过探测 · 不补探测</option>
+                                <option value="InstantBackgroundProbe">跳过探测 · 后台补探测</option>
+                                <option value="OfficialProbe">不跳过探测（官方 ffprobe）</option>
+                            </select>
+                        </div>
+                        <div style="min-width: 0;">
+                            <label class="inputLabel inputLabelUnfocused" for="txtAddUserPolicyDelay" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;">补探测延迟（秒）</label>
+                            <input type="number" class="emby-input" id="txtAddUserPolicyDelay" min="0" max="3600" step="1" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;" />
+                        </div>
+                        <div>
+                            <button is="emby-button" type="button" id="btnAddUserPolicy" class="raised" style="margin: 0; height: 36px; min-width: 84px;">
+                                <span>添加</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="fieldDescription" style="margin-top: 0.6em;">
+                        延迟留空表示沿用全局延迟。保存时「继承全局」的用户不会写入配置文件。
+                    </div>
+                </div>
+
                 <div>
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                         <span>保存</span>

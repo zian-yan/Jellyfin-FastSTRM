@@ -12,8 +12,9 @@ namespace FastSTRM;
 /// <summary>
 /// Registers plugin services via Jellyfin's DI pipeline.
 /// Decorates <see cref="IMediaSourceManager"/> with <see cref="MediaSourceInterceptor"/>,
-/// decorates <see cref="IUserDataManager"/> with <see cref="PlaybackStateInterceptor"/>
-/// and registers <see cref="ProbeService"/> as a hosted singleton.
+/// decorates <see cref="IUserDataManager"/> with <see cref="PlaybackStateInterceptor"/>,
+/// registers <see cref="ProbeService"/> as a hosted singleton and
+/// <see cref="PlaybackPolicyResolver"/> as the playback-policy singleton both decorators share.
 /// </summary>
 public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
@@ -24,6 +25,10 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ProbeService>();
         serviceCollection.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ProbeService>());
 
+        // Single source of truth for "which playback policy applies to this user".
+        // Both interceptors resolve through it instead of reading the configuration directly.
+        serviceCollection.AddSingleton<PlaybackPolicyResolver>();
+
         // Decorate IMediaSourceManager to skip ffprobe for .strm playback.
         DecorateService<IMediaSourceManager>(
             serviceCollection,
@@ -31,6 +36,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
                 inner,
                 sp.GetRequiredService<ILogger<MediaSourceInterceptor>>(),
                 sp,
+                sp.GetRequiredService<PlaybackPolicyResolver>(),
                 ownsInner));
 
         // Decorate IUserDataManager so progress reported for an item that is still being
@@ -41,6 +47,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
                 inner,
                 sp,
                 sp.GetRequiredService<ILogger<PlaybackStateInterceptor>>(),
+                sp.GetRequiredService<PlaybackPolicyResolver>(),
                 ownsInner));
     }
 

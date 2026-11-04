@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.4.0] - 2026-11-04
+
+### ✨ 新增
+
+- 新增 **按用户播放策略**：为单个用户覆盖全局策略（继承全局 / 跳过探测·不补探测 / 跳过探测·后台补探测 / 不跳过探测·官方 ffprobe），可在「跳过探测 · 后台补探测」模式下单独设置补探测延迟。
+- 新增 `GET /FastStrm/PlaybackPolicy`：返回全局策略、每个用户的生效策略与来源（`User` / `Global` / `Inherit` / `Fallback`），并列出已删除用户的孤立条目。
+- 新增 `GET /FastStrm/PlaybackPolicy/Effective`：查询单个用户（或全局）的生效策略。
+- `PlaybackPolicyResolver` 成为播放决策的唯一入口：`MediaSourceInterceptor` 与 `PlaybackStateInterceptor` 不再直接读取配置字段。
+
+### 💬 优化
+
+- 全局策略默认值收敛到 `PluginConfiguration.Default*` 常量：新安装、旧配置缺字段、配置对象不可用三条路径得到完全相同的策略。
+- 策略解析按配置内容指纹缓存，配置未变时不重建；与播放无关的配置（如探测并发数）不会触发重建。
+- 用户级配置非法（拼写错误、空值、重复条目）时回退全局策略并只记一条 Warning，不影响播放。
+
+### 📖 文档
+
+- 新增 Wiki：[按用户播放策略](https://github.com/zian-yan/Jellyfin-FastSTRM/wiki/User-Playback-Policy)（优先级、默认值来源、回退矩阵、读取与生效时机）。
+
+---
+
 ## [3.3.3] - 2026-11-04
 
 ### ✨ 新增

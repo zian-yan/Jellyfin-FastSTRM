@@ -36,6 +36,7 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
     private readonly IMediaSourceManager _inner;
     private readonly ILogger<MediaSourceInterceptor> _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly PlaybackPolicyResolver _policyResolver;
 
     /// <summary>
     /// Whether this decorator is the only owner of <see cref="_inner"/>. An instance that came
@@ -54,11 +55,13 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
         IMediaSourceManager inner,
         ILogger<MediaSourceInterceptor> logger,
         IServiceProvider serviceProvider,
+        PlaybackPolicyResolver policyResolver,
         bool disposeInner)
     {
         _inner = inner;
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _policyResolver = policyResolver;
         _disposeInner = disposeInner;
     }
 
@@ -66,13 +69,12 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
     /// Core interception point — routing for .strm playback:
     /// 1. Non-.strm → passthrough (allowMediaProbe unchanged, zero side effects).
     /// 2. .strm with stream info (RunTimeTicks &gt; 0) → allowMediaProbe = false (skip ffprobe).
-    /// 3. .strm without stream info → allowMediaProbe = false as well by default
-    ///    (instant start, no remote probe); admins can opt back into the official
-    ///    probing fallback via <see cref="Configuration.PluginConfiguration.SkipProbeForUnprobedStrm"/>.
-    ///    When the instant path is used, a background probe is scheduled only if
-    ///    <see cref="Configuration.PluginConfiguration.EnableBackgroundProbeForUnprobedStrm"/> is enabled,
-    ///    after <see cref="Configuration.PluginConfiguration.BackgroundProbeDelaySeconds"/> seconds
-    ///    (default: no background probe).
+    /// 3. .strm without stream info → decided by the playing user's effective playback policy
+    ///    (<see cref="PlaybackPolicyResolver"/>): the user-level policy wins over the global one,
+    ///    and a user without a policy inherits the global one. The policy is read per request, so
+    ///    a configuration change applies to the next playback without a restart.
+    ///    With "skip probe" the item starts instantly and a background probe is scheduled only if
+    ///    the policy asks for it, after the policy's delay (default: no background probe).
     /// </summary>
     public async Task<IReadOnlyList<MediaSourceInfo>> GetPlaybackMediaSources(
         BaseItem item,
@@ -89,15 +91,18 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
         }
 
         var hasStreamInfo = item.RunTimeTicks.HasValue && item.RunTimeTicks.Value > 0;
-        var config = Plugin.Instance?.Configuration;
-        var skipProbe = hasStreamInfo
-                        || (config?.SkipProbeForUnprobedStrm ?? true);
+
+        // 有流条目无条件跳过探测；无流条目按播放者生效策略决定。
+        // user 可能为 null（部分服务端内部调用不带用户上下文），此时解析结果为全局策略。
+        var policy = _policyResolver.Resolve(user?.Id);
+        var skipProbe = hasStreamInfo || policy.SkipProbe;
 
         if (!skipProbe)
         {
             _logger.LogDebug(
-                "FastSTRM: Unprobed .strm, falling back to the official media probe for {Name}",
-                LogSafe.Name(item));
+                "FastSTRM: Unprobed .strm, falling back to the official media probe for {Name} (PolicySource={Source})",
+                LogSafe.Name(item),
+                policy.Source);
 
             return await _inner.GetPlaybackMediaSources(
                 item, user, allowMediaProbe, enablePathSubstitution, cancellationToken)
@@ -105,22 +110,24 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
         }
 
         _logger.LogDebug(
-            "FastSTRM: Skipping ffprobe for {Name} (HasStreamInfo={HasStreamInfo})",
+            "FastSTRM: Skipping ffprobe for {Name} (HasStreamInfo={HasStreamInfo}, User={UserId}, PolicySource={Source})",
             LogSafe.Name(item),
-            hasStreamInfo);
+            hasStreamInfo,
+            user?.Id,
+            policy.Source);
 
         var sources = await _inner.GetPlaybackMediaSources(
             item, user, allowMediaProbe: false, enablePathSubstitution, cancellationToken)
             .ConfigureAwait(false);
 
         int? backgroundProbeDelaySeconds = null;
-        if (!hasStreamInfo && config is { EnableBackgroundProbeForUnprobedStrm: true })
+        if (!hasStreamInfo && policy.ShouldProbeInBackground)
         {
             // Playback starts immediately, but a duration is required for Jellyfin to save
             // resume points and to decide when an item has been watched to completion.
             // Schedule the probe after the playback sources are built so the response and the
             // background refresh never touch the item at the same time.
-            backgroundProbeDelaySeconds = config.GetBackgroundProbeDelaySeconds();
+            backgroundProbeDelaySeconds = policy.BackgroundProbeDelaySeconds;
             ScheduleBackgroundProbe(item, backgroundProbeDelaySeconds.Value);
         }
 

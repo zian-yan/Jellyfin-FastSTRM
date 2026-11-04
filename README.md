@@ -7,7 +7,7 @@
 <p align="center">让 Jellyfin 的 <code>.strm</code> 媒体跳过远程 <code>ffprobe</code>，点击即播。</p>
 
 <p align="center">
-  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.3.3-blue" alt="Release"></a>
+  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.4.0-blue" alt="Release"></a>
   <img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple" alt="Jellyfin 12.0+">
   <img src="https://img.shields.io/badge/.NET-10.0-blueviolet" alt=".NET 10.0">
 </p>
@@ -76,6 +76,28 @@ PlaybackInfo 请求
 
 ---
 
+## 按用户播放策略
+
+上面的配置是**全局策略**，也就是所有用户的基线。同一个部署里往往需要区别对待：一部分用户走「跳过探测 + 不补探测」的极速路径，另一部分（TV 端、需要完整轨道与进度的用户）只关掉「跳过探测」回退官方 ffprobe。
+在 **控制台 → 插件 → FastSTRM → 按用户播放策略** 中可以为单个用户覆盖：
+
+| 模式 | 跳过探测 | 后台补探测 |
+| :--- | :---: | :---: |
+| **继承全局**（默认，等于未配置） | 取全局 | 取全局 |
+| **跳过探测 · 不补探测** | 是 | 否 |
+| **跳过探测 · 后台补探测** | 是 | 是（可按用户单独设延迟） |
+| **不跳过探测（官方 ffprobe）** | 否 | 否 |
+
+- **优先级**：用户级 > 全局 > 内置默认值。未单独配置的用户继承全局策略。
+- **默认值来源**：全局策略的默认值只有一处来源（`PluginConfiguration.Default*` 常量）。新安装、旧配置文件缺字段、配置对象不可用时都归到同一套值：跳过探测 **开**、后台补探测 **关**、延迟 **5s**、停止取消 **开**。
+- **回退**：用户级模式非法、为空或重复配置时回退全局策略，只记一条 Warning，**不会阻断播放**；坏配置只影响它自己的用户。
+- **生效时机**：每次 PlaybackInfo 请求与进度上报时现取策略，保存后**下一次播放**即生效，无需重启，也不影响正在播放的会话。
+- **有流条目**（`RunTimeTicks > 0`）不受任何策略影响，依然无条件秒开。
+
+细节、回退矩阵与接口示例见 Wiki：[**按用户播放策略**](https://github.com/zian-yan/Jellyfin-FastSTRM/wiki/User-Playback-Policy)
+
+---
+
 ## 安装
 
 **方式一：下载 Release**
@@ -110,7 +132,9 @@ dotnet build -c Release
 
 | 方法 | 路径 | 说明 |
 | :--- | :--- | :--- |
-| `GET` | `/FastStrm/Summary` | 统计概览与当前起播策略 |
+| `GET` | `/FastStrm/Summary` | 统计概览与当前全局策略 |
+| `GET` | `/FastStrm/PlaybackPolicy` | 全局策略 + 每个用户的生效策略与来源（`?userId=` 只查一个用户） |
+| `GET` | `/FastStrm/PlaybackPolicy/Effective` | 单个用户的生效策略；不带 `userId` 返回全局策略 |
 | `POST` | `/FastStrm/Probe/Start?mode=Incremental` | 启动探测（`Incremental` / `Full`） |
 | `POST` | `/FastStrm/Probe/Stop` | 停止探测 |
 | `GET` | `/FastStrm/Probe/Status` | 任务状态、进度与当前文件 |
@@ -163,5 +187,6 @@ Wiki 源文件位于仓库 `wiki/` 目录，修改后执行 `bash scripts/publis
 - `.strm` **with** stream info (`RunTimeTicks > 0`): probing is always disabled — instant start, full metadata, resume and watched-state intact.
 - `.strm` **without** stream info: instant start by default (no upstream request at all). Optionally a background probe is scheduled a few seconds after playback begins to fill in duration and tracks — a `IUserDataManager` decorator keeps the resume position meanwhile.
 - Non-`.strm` files pass through untouched.
+- **Per-user playback policies**: the admin console can override the global policy per user (inherit / instant without probe / instant with a background probe / official probe). A user without an override inherits the global policy; an invalid override falls back to it instead of blocking playback.
 
 Ships with library-wide incremental/full pre-probing, auto-probe on item added, and an admin dashboard plus REST API. Requires Jellyfin 12.0+ and .NET 10.0.
