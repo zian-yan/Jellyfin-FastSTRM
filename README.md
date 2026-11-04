@@ -133,11 +133,6 @@ dotnet build -c Release
    ```text
    https://cdn.jsdelivr.net/gh/zian-yan/Jellyfin-FastSTRM@main/manifest.json
    ```
-## 开发版仓库（dev 预发行）
-
-  ```text
-  https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/dev/manifest-dev.json
-  ```
 ---
 
 ## 文档
