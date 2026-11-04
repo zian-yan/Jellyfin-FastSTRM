@@ -23,8 +23,10 @@ namespace FastSTRM;
 /// 模式无法识别 → 全局并记一条 Warning；解析过程抛异常 → 全局。
 /// </para>
 /// <para>
-/// 读取时机：调用方在每次播放决策时现取（PlaybackInfo 请求、进度上报、播放停止），
-/// 因此配置保存后立即对新请求生效，不需要重启，也不影响正在播放的会话。
+/// 读取时机：取源链路（PlaybackInfo）每次现取，并把结论记为该条目「本次播放的策略」
+/// （<see cref="RememberPlaybackPolicy"/>）；进度上报优先复用这条结论，
+/// 因此同一次播放内不会因为会话信息缺失而改用另一套策略。
+/// 配置保存后对下一次取源立即生效，不需要重启，也不影响正在播放的会话。
 /// 解析结果按配置内容做指纹缓存，热路径上只多一次字典查找。
 /// </para>
 /// </remarks>
@@ -37,9 +39,22 @@ public sealed class PlaybackPolicyResolver
 
     private const long DefaultFingerprint = 0;
 
+    /// <summary>
+    /// 本次播放策略记录的上限。条目只用于「同一次播放内保持一致」，播放量再大也不该常驻，
+    /// 因此超过上限直接清空（清空后进度上报退回会话反查，不会误判）。
+    /// </summary>
+    private const int MaxTrackedPlaybackPolicies = 8192;
+
     private readonly ILogger<PlaybackPolicyResolver> _logger;
     private readonly object _rebuildLock = new();
     private readonly ConcurrentDictionary<string, byte> _warnedEntries = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// 条目 Id → 取源时解析出的生效策略。播放进度上报没有用户参数，
+    /// 不能重新解析（会话可能刚好结束，反查不到用户就会退回全局策略），
+    /// 因此用取源时的结论贯穿整次播放。
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, EffectivePlaybackPolicy> _playbackPolicies = new();
 
     /// <summary>
     /// 当前生效的解析快照。整对象替换（而不是原地修改），读者无需加锁。
@@ -99,6 +114,47 @@ public sealed class PlaybackPolicyResolver
     {
         policy = null;
         return userId != Guid.Empty && GetSnapshot().Policies.TryGetValue(userId, out policy);
+    }
+
+    // ── 本次播放的策略上下文 ──
+
+    /// <summary>
+    /// 记录某条目本次播放生效的策略，由取源链路（PlaybackInfo）写入。
+    /// </summary>
+    /// <remarks>
+    /// 记录的是**解析结果**而不是用户 Id：整次播放期间策略保持不变，
+    /// 后续进度上报即使拿不到用户上下文，也不会退回全局策略而违背用户级选择。
+    /// 下一次 PlaybackInfo 会覆盖这条记录，所以中间没有失效窗口。
+    /// </remarks>
+    public void RememberPlaybackPolicy(Guid itemId, EffectivePlaybackPolicy policy)
+    {
+        if (itemId == Guid.Empty)
+        {
+            return;
+        }
+
+        if (_playbackPolicies.Count >= MaxTrackedPlaybackPolicies)
+        {
+            // 只是「本次播放」的旁路缓存：清空后进度上报会退回会话反查 / 全局策略。
+            _playbackPolicies.Clear();
+        }
+
+        _playbackPolicies[itemId] = policy;
+    }
+
+    /// <summary>
+    /// 取出某条目本次播放生效的策略。
+    /// </summary>
+    /// <returns><c>false</c> 表示没有记录（该条目还没走过取源链路，或记录已被清理）。</returns>
+    public bool TryGetPlaybackPolicy(Guid itemId, out EffectivePlaybackPolicy policy)
+    {
+        if (itemId != Guid.Empty && _playbackPolicies.TryGetValue(itemId, out policy))
+        {
+            return true;
+        }
+
+        policy = default;
+        return false;
     }
 
     // ── 解析 ──

@@ -136,13 +136,20 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
         {
             data.PlaybackPositionTicks = reportedPositionTicks.Value;
 
-            // 补探测是否调度沿用播放者自己的生效策略（用户级优先，未配置继承全局）。
-            // UpdatePlayState 不带用户参数，因此从正在播放该条目的会话反查用户；
-            // 查不到会话（例如手动标记已看）时按全局策略处理。
+            // 补探测是否调度，沿用「本次播放」的策略：
+            // 优先用取源时记录下来的结论，这样同一次播放内起播决策与进度上报永远一致。
+            // 只有在没有记录时（该条目没走过取源链路）才回退到会话反查 + 全局策略。
+            var playingUserId = ResolvePlayingUserId(item);
+            var policy = _policyResolver.TryGetPlaybackPolicy(item.Id, out var playbackPolicy)
+                ? playbackPolicy
+                : _policyResolver.Resolve(playingUserId);
+
+            // 进度上报在播放停止后还会补发一次，那时已经没有会话在播该条目。
+            // 这种上报只保存进度，绝不再新起补探测：否则会出现「播放已停止，后台还在下载探流」，
+            // 而且没有用户上下文时退回全局策略还可能违背用户级的「不补探测」。
             // The official-probe fallback (skip disabled) handles probing itself, so no background
             // probe is scheduled in that mode either.
-            var policy = _policyResolver.Resolve(ResolvePlayingUserId(item));
-            var backgroundProbeDelaySeconds = policy.ShouldProbeInBackground
+            var backgroundProbeDelaySeconds = policy.ShouldProbeInBackground && playingUserId.HasValue
                 ? policy.BackgroundProbeDelaySeconds
                 : (int?)null;
 
@@ -166,7 +173,7 @@ public sealed class PlaybackStateInterceptor : IUserDataManager, IDisposable
                     else
                     {
                         _logger.LogInformation(
-                            "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; background probing is disabled for this user's playback policy, so completion cannot be tracked until a probe runs",
+                            "FastSTRM: Preserving playback position {Position} for {Name} because its duration is not known yet; no background probe is scheduled for this playback, so completion cannot be tracked until a probe runs",
                             reportedPositionTicks.Value,
                             LogSafe.Name(item));
                     }

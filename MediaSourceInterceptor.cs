@@ -95,6 +95,12 @@ public sealed class MediaSourceInterceptor : IMediaSourceManager, IDisposable
         // 有流条目无条件跳过探测；无流条目按播放者生效策略决定。
         // user 可能为 null（部分服务端内部调用不带用户上下文），此时解析结果为全局策略。
         var policy = _policyResolver.Resolve(user?.Id);
+
+        // 记住了这条策略，后续进度上报沿用它。进度上报发生在播放停止前后，
+        // 那时很可能已经查不到「正在播放该条目的会话」，重新解析会退回全局策略，
+        // 从而违背用户级「不补探测」的选择（曾经的线上 bug）。
+        _policyResolver.RememberPlaybackPolicy(item.Id, policy);
+
         var skipProbe = hasStreamInfo || policy.SkipProbe;
 
         if (!skipProbe)
