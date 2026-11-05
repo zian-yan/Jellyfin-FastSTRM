@@ -1,6 +1,6 @@
 # FastSTRM Wiki
 
-Jellyfin `.strm` 秒开插件的补充文档。安装、配置项与控制台说明见 [README](https://github.com/zian-yan/Jellyfin-FastSTRM#readme)。
+Jellyfin `.strm` 秒开插件的补充文档。安装、配置项与控制台说明见 [README](https://github.com/zian-yan/jellyfin-plugin-faststrm#readme)。
 
 ## 文档
 
@@ -17,7 +17,7 @@ Jellyfin `.strm` 秒开插件的补充文档。安装、配置项与控制台说
 
 ## 相关链接
 
-- [源码](https://github.com/zian-yan/Jellyfin-FastSTRM)
-- [Releases](https://github.com/zian-yan/Jellyfin-FastSTRM/releases)
-- [CHANGELOG](https://github.com/zian-yan/Jellyfin-FastSTRM/blob/main/CHANGELOG.md)
-- [Issues](https://github.com/zian-yan/Jellyfin-FastSTRM/issues)
+- [源码](https://github.com/zian-yan/jellyfin-plugin-faststrm)
+- [Releases](https://github.com/zian-yan/jellyfin-plugin-faststrm/releases)
+- [CHANGELOG](https://github.com/zian-yan/jellyfin-plugin-faststrm/blob/main/CHANGELOG.md)
+- [Issues](https://github.com/zian-yan/jellyfin-plugin-faststrm/issues)

@@ -125,4 +125,4 @@ FastSTRM: Background probe of <名称> produced no stream info (RunTimeTicks=nul
 - 3.1.0 起，无流条目默认直接跳过探测，不再等待 `ffprobe`；
 - 配置文件缺字段时按默认值处理，无需手工修改。
 
-完整变更见 [CHANGELOG](https://github.com/zian-yan/Jellyfin-FastSTRM/blob/main/CHANGELOG.md)。
+完整变更见 [CHANGELOG](https://github.com/zian-yan/jellyfin-plugin-faststrm/blob/main/CHANGELOG.md)。

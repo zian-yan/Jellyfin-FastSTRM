@@ -2,18 +2,19 @@
 """Insert (or replace) the just-released version in manifest.json.
 
 Reads:  meta.json (version + targetAbi), RELEASE_NOTES.md (changelog)
-Env:    RELEASE_TAG (e.g. v3.2.0), CHECKSUM (MD5 of FastSTRM.zip)
+Env:    RELEASE_TAG (e.g. 3.4.1), CHECKSUM (MD5 of FastSTRM.zip)
 """
 
 import datetime
 import json
 import os
 
-REPO = "zian-yan/Jellyfin-FastSTRM"
+REPO = "zian-yan/jellyfin-plugin-faststrm"
 
 
 def main() -> None:
-    tag = os.environ["RELEASE_TAG"]
+    # 标签只带版本号，兼容历史 v 前缀
+    tag = os.environ["RELEASE_TAG"].removeprefix("v")
     checksum = os.environ.get("CHECKSUM", "")
 
     with open("meta.json", encoding="utf-8") as handle:

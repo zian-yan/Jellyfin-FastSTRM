@@ -7,7 +7,7 @@
 
 ### 仓库
 
-- [README](https://github.com/zian-yan/Jellyfin-FastSTRM#readme)
-- [Releases](https://github.com/zian-yan/Jellyfin-FastSTRM/releases)
-- [CHANGELOG](https://github.com/zian-yan/Jellyfin-FastSTRM/blob/main/CHANGELOG.md)
-- [Issues](https://github.com/zian-yan/Jellyfin-FastSTRM/issues)
+- [README](https://github.com/zian-yan/jellyfin-plugin-faststrm#readme)
+- [Releases](https://github.com/zian-yan/jellyfin-plugin-faststrm/releases)
+- [CHANGELOG](https://github.com/zian-yan/jellyfin-plugin-faststrm/blob/main/CHANGELOG.md)
+- [Issues](https://github.com/zian-yan/jellyfin-plugin-faststrm/issues)

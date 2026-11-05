@@ -3,13 +3,14 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      # 只接受纯版本号标签（如 3.4.1、3.5.0-rc.1），不再使用 v 前缀
+      - '[0-9]*'
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name to release (e.g. v3.2.0)'
+        description: 'Tag name to release (version only, e.g. 3.4.1)'
         required: true
-        default: 'v3.2.0'
+        default: '3.4.1'
 
 permissions:
   contents: write
@@ -36,6 +37,9 @@ jobs:
 
           RAW_TAG="${{ github.event.inputs.tag_name || github.ref_name }}"
 
+          # 标签只带版本号：容错去掉误加的前缀 v
+          TAG_NAME="${RAW_TAG#v}"
+
           # 只去掉第四段版本号：3.1.0.0 -> 3.1.0，3.1.0 保持不变
           normalize() {
             if [[ "$1" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+$ ]]; then
@@ -45,15 +49,15 @@ jobs:
             fi
           }
 
-          CLEAN_VER=$(normalize "${RAW_TAG#v}")
-          echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
+          CLEAN_VER=$(normalize "$TAG_NAME")
+          echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
           echo "clean=${CLEAN_VER}" >> "$GITHUB_OUTPUT"
 
           CSPROJ_VER=$(grep -oP '(?<=<Version>)[^<]+' FastSTRM.csproj | head -n1)
           META_VER=$(grep -oP '(?<="version": ")[^"]+' meta.json | head -n1)
           BUILD_VER=$(grep -oP '(?<=^version: ")[^"]+' build.yaml | head -n1)
 
-          echo "tag=${RAW_TAG} clean=${CLEAN_VER} csproj=${CSPROJ_VER} meta=${META_VER} build=${BUILD_VER}"
+          echo "tag=${TAG_NAME} clean=${CLEAN_VER} csproj=${CSPROJ_VER} meta=${META_VER} build=${BUILD_VER}"
           echo "normalized: csproj=$(normalize "${CSPROJ_VER}") meta=$(normalize "${META_VER}") build=$(normalize "${BUILD_VER}")"
 
           for pair in "FastSTRM.csproj:${CSPROJ_VER}" "meta.json:${META_VER}" "build.yaml:${BUILD_VER}"; do
@@ -61,7 +65,7 @@ jobs:
             value="${pair#*:}"
             norm_val=$(normalize "$value")
             if [ "$norm_val" != "$CLEAN_VER" ]; then
-              echo "::error::版本不一致：${file} 是 ${value}（归一化 ${norm_val}），tag 是 ${RAW_TAG}（期望 ${CLEAN_VER}）"
+              echo "::error::版本不一致：${file} 是 ${value}（归一化 ${norm_val}），tag 是 ${TAG_NAME}（期望 ${CLEAN_VER}）"
               exit 1
             fi
           done
@@ -88,7 +92,6 @@ jobs:
 
       - name: Extract Release Notes
         env:
-          RAW_TAG: ${{ steps.version.outputs.tag }}
           CLEAN_VER: ${{ steps.version.outputs.clean }}
         run: |
           set -e
@@ -104,7 +107,7 @@ jobs:
 
           if [ ! -s RELEASE_NOTES.md ]; then
             echo "::warning::CHANGELOG.md 中没有找到 ${CLEAN_VER} 段落，使用默认说明"
-            printf 'Jellyfin-FastSTRM %s\n' "$RAW_TAG" > RELEASE_NOTES.md
+            printf 'jellyfin-plugin-faststrm %s\n' "$CLEAN_VER" > RELEASE_NOTES.md
           fi
 
           echo "----- RELEASE_NOTES.md -----"
@@ -114,7 +117,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Jellyfin-FastSTRM ${{ steps.version.outputs.tag }}
+          name: jellyfin-plugin-faststrm ${{ steps.version.outputs.clean }}
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false

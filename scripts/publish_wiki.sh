@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-REPO_SLUG="${WIKI_REPO:-zian-yan/Jellyfin-FastSTRM}"
+REPO_SLUG="${WIKI_REPO:-zian-yan/jellyfin-plugin-faststrm}"
 REMOTE="https://github.com/${REPO_SLUG}.wiki.git"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../wiki" && pwd)"
 WORK_DIR="$(mktemp -d)"
@@ -29,7 +29,7 @@ error: the wiki repository could not be cloned.
 
 The GitHub wiki must be initialised once in the browser before it can be
 pushed to:
-  1. open https://github.com/zian-yan/Jellyfin-FastSTRM/wiki
+  1. open https://github.com/zian-yan/jellyfin-plugin-faststrm/wiki
   2. click "Create the first page", save any content
   3. re-run this script
 EOF

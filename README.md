@@ -2,12 +2,12 @@
   <img src="images/faststrm-banner.png" alt="FastSTRM" width="520">
 </p>
 
-<h1 align="center">Jellyfin-FastSTRM</h1>
+<h1 align="center">jellyfin-plugin-faststrm</h1>
 
 <p align="center">让 Jellyfin 的 <code>.strm</code> 媒体跳过远程 <code>ffprobe</code>，点击即播。</p>
 
 <p align="center">
-  <a href="https://github.com/zian-yan/Jellyfin-FastSTRM/releases"><img src="https://img.shields.io/badge/Release-v3.4.1-blue" alt="Release"></a>
+  <a href="https://github.com/zian-yan/jellyfin-plugin-faststrm/releases"><img src="https://img.shields.io/badge/Release-3.4.1-blue" alt="Release"></a>
   <img src="https://img.shields.io/badge/Jellyfin-12.0%2B-purple" alt="Jellyfin 12.0+">
   <img src="https://img.shields.io/badge/.NET-10.0-blueviolet" alt=".NET 10.0">
 </p>
@@ -92,7 +92,7 @@ PlaybackInfo 请求
 **默认组合**是「无流 · 不补探测」，适合绝大多数部署；需要进度条、续播或轨道切换时，开启后台补探测即可。
 
 各模式的完整触发条件、使用差异、适用场景、对比矩阵与选型建议见 Wiki：
-[**播放模式：有流与无流**](https://github.com/zian-yan/Jellyfin-FastSTRM/wiki/Playback-Modes)
+[**播放模式：有流与无流**](https://github.com/zian-yan/jellyfin-plugin-faststrm/wiki/Playback-Modes)
 
 ---
 
@@ -114,7 +114,7 @@ PlaybackInfo 请求
 - **生效时机**：每次 PlaybackInfo 请求时现取策略，保存后**下一次播放**即生效，无需重启，也不影响正在播放的会话；播放过程中的进度上报复用取源时的这份策略，同一次播放内不会改判，播放停止后的进度补发也不会再发起补探测。
 - **有流条目**（`RunTimeTicks > 0`）不受任何策略影响，依然无条件秒开。
 
-细节、回退矩阵与接口示例见 Wiki：[**按用户播放策略**](https://github.com/zian-yan/Jellyfin-FastSTRM/wiki/User-Playback-Policy)
+细节、回退矩阵与接口示例见 Wiki：[**按用户播放策略**](https://github.com/zian-yan/jellyfin-plugin-faststrm/wiki/User-Playback-Policy)
 
 ---
 
@@ -122,7 +122,7 @@ PlaybackInfo 请求
 
 **方式一：下载 Release**
 
-1. 下载 [最新版本](https://github.com/zian-yan/Jellyfin-FastSTRM/releases) 的 `FastSTRM.dll`。
+1. 下载 [最新版本](https://github.com/zian-yan/jellyfin-plugin-faststrm/releases) 的 `FastSTRM.dll`。
 2. 放入 Jellyfin 插件目录下的 `FastSTRM` 文件夹：
 
 | 运行环境 | 插件路径 |
@@ -137,8 +137,8 @@ PlaybackInfo 请求
 **方式二：源码编译**（需 [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)）
 
 ```bash
-git clone https://github.com/zian-yan/Jellyfin-FastSTRM.git
-cd Jellyfin-FastSTRM
+git clone https://github.com/zian-yan/jellyfin-plugin-faststrm.git
+cd jellyfin-plugin-faststrm
 dotnet build -c Release
 ```
 
@@ -167,7 +167,7 @@ dotnet build -c Release
 2. 名称填 `FastSTRM`，地址填：
 
    ```text
-   https://raw.githubusercontent.com/zian-yan/Jellyfin-FastSTRM/main/manifest.json
+   https://raw.githubusercontent.com/zian-yan/jellyfin-plugin-faststrm/main/manifest.json
    ```
 
 3. 保存后在「插件 → 目录」搜索 `FastSTRM` 安装。
@@ -175,7 +175,7 @@ dotnet build -c Release
    若 `raw.githubusercontent.com` 访问不稳定，可改用 jsDelivr 镜像（缓存约 12 小时）：
 
    ```text
-   https://cdn.jsdelivr.net/gh/zian-yan/Jellyfin-FastSTRM@main/manifest.json
+   https://cdn.jsdelivr.net/gh/zian-yan/jellyfin-plugin-faststrm@main/manifest.json
    ```
 ---
 
@@ -183,10 +183,10 @@ dotnet build -c Release
 
 | 文档 | 内容 |
 | :--- | :--- |
-| [Wiki 首页](https://github.com/zian-yan/Jellyfin-FastSTRM/wiki) | 文档索引 |
-| [播放模式：有流与无流](https://github.com/zian-yan/Jellyfin-FastSTRM/wiki/Playback-Modes) | 触发条件、使用差异、适用场景、对比矩阵、选型建议 |
-| [排障](https://github.com/zian-yan/Jellyfin-FastSTRM/wiki/Troubleshooting) | 起播慢、无时长、进度丢失、补探测失败、任务无法启动 |
-| [CHANGELOG](https://github.com/zian-yan/Jellyfin-FastSTRM/blob/main/CHANGELOG.md) | 版本变更 |
+| [Wiki 首页](https://github.com/zian-yan/jellyfin-plugin-faststrm/wiki) | 文档索引 |
+| [播放模式：有流与无流](https://github.com/zian-yan/jellyfin-plugin-faststrm/wiki/Playback-Modes) | 触发条件、使用差异、适用场景、对比矩阵、选型建议 |
+| [排障](https://github.com/zian-yan/jellyfin-plugin-faststrm/wiki/Troubleshooting) | 起播慢、无时长、进度丢失、补探测失败、任务无法启动 |
+| [CHANGELOG](https://github.com/zian-yan/jellyfin-plugin-faststrm/blob/main/CHANGELOG.md) | 版本变更 |
 
 Wiki 源文件位于仓库 `wiki/` 目录，修改后执行 `bash scripts/publish_wiki.sh` 发布。
 

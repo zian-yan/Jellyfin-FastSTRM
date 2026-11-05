@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 📖 文档
 
-- 新增 Wiki：[按用户播放策略](https://github.com/zian-yan/Jellyfin-FastSTRM/wiki/User-Playback-Policy)（优先级、默认值来源、回退矩阵、读取与生效时机）。
+- 新增 Wiki：[按用户播放策略](https://github.com/zian-yan/jellyfin-plugin-faststrm/wiki/User-Playback-Policy)（优先级、默认值来源、回退矩阵、读取与生效时机）。
 
 ---
 
