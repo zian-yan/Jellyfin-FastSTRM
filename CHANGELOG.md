@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ 新增
+
+- 配置页支持多语言：文案跟随 Jellyfin 界面语言自动切换中文（简体 / 繁体）与英文，非中文环境一律显示英文；语言取 `<html lang>` 与当前区域设置，无需手动选择。
+
 ### 📖 文档
 
 - README 拆分为英文（`README.md`，默认展示）与中文（`README.zh-CN.md`）两个版本，顶部语言切换可互相跳转。

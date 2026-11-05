@@ -15,15 +15,15 @@
                 <!-- 三大指标 -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1em; padding-bottom: 1.2em; border-bottom: 1px solid rgba(255, 255, 255, 0.06); text-align: center;">
                     <div>
-                        <div style="font-size: 0.8em; color: #888; margin-bottom: 0.2em;">.strm 媒体数量</div>
+                        <div style="font-size: 0.8em; color: #888; margin-bottom: 0.2em;" data-i18n="summary.total">.strm 媒体数量</div>
                         <div id="lblSummaryTotal" style="font-size: 1.6em; font-weight: 600; color: #fff;">-</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.8em; color: #81c784; margin-bottom: 0.2em;">已有流信息</div>
+                        <div style="font-size: 0.8em; color: #81c784; margin-bottom: 0.2em;" data-i18n="summary.probed">已有流信息</div>
                         <div id="lblSummaryProbed" style="font-size: 1.6em; font-weight: 600; color: #4caf50;">-</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.8em; color: #ffb74d; margin-bottom: 0.2em;">缺少流信息</div>
+                        <div style="font-size: 0.8em; color: #ffb74d; margin-bottom: 0.2em;" data-i18n="summary.unprobed">缺少流信息</div>
                         <div id="lblSummaryUnprobed" style="font-size: 1.6em; font-weight: 600; color: #ff9800;">-</div>
                     </div>
                 </div>
@@ -32,16 +32,16 @@
                 <div class="flex align-items-center" style="gap: 0.8em; margin-top: 1.2em; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 180px;">
                         <select is="emby-select" id="selectProbeMode" class="emby-select" style="margin: 0; width: 100%; height: 38px; box-sizing: border-box;">
-                            <option value="Incremental">增量探测</option>
-                            <option value="Full">全量探测</option>
+                            <option value="Incremental" data-i18n="probe.mode.incremental">增量探测</option>
+                            <option value="Full" data-i18n="probe.mode.full">全量探测</option>
                         </select>
                     </div>
                     <div>
                         <button is="emby-button" type="button" id="btnStartProbe" class="raised button-submit" style="margin: 0; min-width: 120px; height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;">
-                            <span>启动预探测</span>
+                            <span data-i18n="probe.start">启动预探测</span>
                         </button>
                         <button is="emby-button" type="button" id="btnStopProbe" class="raised" style="margin: 0; min-width: 120px; height: 38px; box-sizing: border-box; display: none; background: #b71c1c; color: white; align-items: center; justify-content: center;">
-                            <span>停止</span>
+                            <span data-i18n="probe.stop">停止</span>
                         </button>
                     </div>
                 </div>
@@ -49,7 +49,7 @@
                 <!-- 实时进度区域 -->
                 <div id="probeProgressSection" style="margin-top: 1.4em;">
                     <div style="font-size: 0.85em; margin-bottom: 0.5em;">
-                        <span id="lblTaskStatus" style="color: #999;">执行状态: 空闲</span>
+                        <span id="lblTaskStatus" style="color: #999;"><span data-i18n="status.prefix">执行状态: </span><span id="lblTaskState" data-i18n="status.state.Idle">空闲</span></span>
                     </div>
 
                     <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden;">
@@ -57,7 +57,7 @@
                     </div>
 
                     <div id="probeCurrentItemRow" style="font-size: 0.8em; color: #777; margin-top: 0.6em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        正在探测: <span id="lblCurrentItem" style="color: #bbb;">-</span>
+                        <span data-i18n="probe.currentItemLabel">正在探测: </span><span id="lblCurrentItem" style="color: #bbb;">-</span>
                     </div>
                 </div>
 
@@ -68,44 +68,44 @@
         <form class="fastStrmConfigurationForm">
             <div class="verticalSection verticalSection-extrabottompadding">
                 <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="txtProbeConcurrency">探测并发数</label>
+                    <label class="inputLabel inputLabelUnfocused" for="txtProbeConcurrency" data-i18n="config.concurrency">探测并发数</label>
                     <input is="emby-input" type="number" id="txtProbeConcurrency" min="1" max="16" step="1" value="1" />
-                    <div class="fieldDescription">
+                    <div class="fieldDescription" data-i18n="config.concurrencyDesc">
                         增量探测、全量探测、入库自动探测与补探测统一使用该并发数，默认 1，范围 1–16。
                     </div>
                 </div>
                 <div class="checkboxContainer checkboxContainer-anonymouscheckbox">
                     <label>
                         <input is="emby-checkbox" type="checkbox" id="chkEnableAutoProbe" />
-                        <span>Strm入库自动探测</span>
+                        <span data-i18n="config.autoProbe">Strm入库自动探测</span>
                     </label>
                 </div>
                 <div class="checkboxContainer checkboxContainer-anonymouscheckbox">
                     <label>
                         <input is="emby-checkbox" type="checkbox" id="chkSkipProbeForUnprobedStrm" />
-                        <span>未探测的 STRM 文件也跳过探测</span>
+                        <span data-i18n="config.skipUnprobed">未探测的 STRM 文件也跳过探测</span>
                     </label>
                 </div>
-                <div class="fieldDescription" style="margin-top: -0.4em; margin-bottom: 1em;">
+                <div class="fieldDescription" style="margin-top: -0.4em; margin-bottom: 1em;" data-i18n="config.skipUnprobedDesc">
                     开启：跳过 ffprobe 直接起播；关闭：回退官方探测。
                 </div>
 
                 <div id="unprobedPlaybackOptions" style="margin-left: 1.7em; margin-bottom: 1em;">
                     <div class="selectContainer">
-                        <label class="selectLabel" for="selectUnprobedPlaybackMode">起播后策略</label>
+                        <label class="selectLabel" for="selectUnprobedPlaybackMode" data-i18n="config.afterStartMode">起播后策略</label>
                         <select is="emby-select" id="selectUnprobedPlaybackMode" class="emby-select-withcolor emby-select">
-                            <option value="None">不补探测（默认）</option>
-                            <option value="Background">后台补探测</option>
+                            <option value="None" data-i18n="config.afterStart.none">不补探测（默认）</option>
+                            <option value="Background" data-i18n="config.afterStart.background">后台补探测</option>
                         </select>
-                        <div class="fieldDescription">
+                        <div class="fieldDescription" data-i18n="config.afterStartDesc">
                             仅在开关开启时生效；不补探测不会再次请求流地址。
                         </div>
                     </div>
 
                     <div class="inputContainer" id="backgroundProbeDelayContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtBackgroundProbeDelay">补探测延迟（秒）</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtBackgroundProbeDelay" data-i18n="config.backgroundDelay">补探测延迟（秒）</label>
                         <input is="emby-input" type="number" id="txtBackgroundProbeDelay" min="0" max="3600" step="1" value="5" />
-                        <div class="fieldDescription">
+                        <div class="fieldDescription" data-i18n="config.backgroundDelayDesc">
                             默认 5 秒，范围 0–3600。
                         </div>
                     </div>
@@ -114,10 +114,10 @@
                         <div class="checkboxContainer checkboxContainer-anonymouscheckbox" style="margin-top: 0.4em;">
                             <label>
                                 <input is="emby-checkbox" type="checkbox" id="chkCancelProbeOnPlaybackStop" />
-                                <span>播放停止后取消补探测</span>
+                                <span data-i18n="config.cancelOnStop">播放停止后取消补探测</span>
                             </label>
                         </div>
-                        <div class="fieldDescription" style="margin-top: -0.4em;">
+                        <div class="fieldDescription" style="margin-top: -0.4em;" data-i18n="config.cancelOnStopDesc">
                             默认开启；关闭后播放停止仍会继续补探测。
                         </div>
                     </div>
@@ -126,16 +126,16 @@
                 <!-- 按用户播放策略 -->
                 <div id="userPlaybackPolicySection" style="margin-top: 1.6em; padding-top: 1.4em; border-top: 1px solid rgba(255, 255, 255, 0.08);">
                     <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 1em; flex-wrap: wrap;">
-                        <h3 style="margin: 0; font-size: 1.05em; font-weight: 600;">按用户播放策略</h3>
+                        <h3 style="margin: 0; font-size: 1.05em; font-weight: 600;" data-i18n="userPolicy.title">按用户播放策略</h3>
                         <span id="lblUserPolicySummary" style="font-size: 0.8em; color: #888;">-</span>
                     </div>
 
-                    <div class="fieldDescription" style="margin-top: 0.5em;">
+                    <div class="fieldDescription" style="margin-top: 0.5em;" data-i18n="userPolicy.desc">
                         用户级配置优先于上方全局配置；未在此列出的用户继承全局策略。
                         策略在每次播放请求时读取，保存后对下一次播放生效，不影响正在播放的会话。
                     </div>
 
-                    <div id="userPolicyEmpty" style="margin-top: 0.9em; font-size: 0.85em; color: #777;">
+                    <div id="userPolicyEmpty" style="margin-top: 0.9em; font-size: 0.85em; color: #777;" data-i18n="userPolicy.empty">
                         暂无用户级配置，所有用户继承全局策略。
                     </div>
 
@@ -143,36 +143,36 @@
 
                     <div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 0.9fr) auto; gap: 0.6em; align-items: end; margin-top: 1.1em; padding-top: 1em; border-top: 1px dashed rgba(255, 255, 255, 0.1);">
                         <div style="min-width: 0;">
-                            <label class="inputLabel inputLabelUnfocused" for="selectAddUserPolicyUser" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;">用户</label>
+                            <label class="inputLabel inputLabelUnfocused" for="selectAddUserPolicyUser" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;" data-i18n="userPolicy.user">用户</label>
                             <select class="emby-select" id="selectAddUserPolicyUser" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;"></select>
                         </div>
                         <div style="min-width: 0;">
-                            <label class="inputLabel inputLabelUnfocused" for="selectAddUserPolicyMode" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;">播放策略</label>
+                            <label class="inputLabel inputLabelUnfocused" for="selectAddUserPolicyMode" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;" data-i18n="userPolicy.mode">播放策略</label>
                             <select class="emby-select" id="selectAddUserPolicyMode" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;">
-                                <option value="InstantNoProbe">跳过探测 · 不补探测</option>
-                                <option value="InstantBackgroundProbe">跳过探测 · 后台补探测</option>
-                                <option value="OfficialProbe">不跳过探测（官方 ffprobe）</option>
+                                <option value="InstantNoProbe" data-i18n="policyMode.InstantNoProbe">跳过探测 · 不补探测</option>
+                                <option value="InstantBackgroundProbe" data-i18n="policyMode.InstantBackgroundProbe">跳过探测 · 后台补探测</option>
+                                <option value="OfficialProbe" data-i18n="policyMode.OfficialProbe">不跳过探测（官方 ffprobe）</option>
                             </select>
                         </div>
                         <div style="min-width: 0;">
-                            <label class="inputLabel inputLabelUnfocused" for="txtAddUserPolicyDelay" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;">补探测延迟（秒）</label>
+                            <label class="inputLabel inputLabelUnfocused" for="txtAddUserPolicyDelay" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;" data-i18n="config.backgroundDelay">补探测延迟（秒）</label>
                             <input type="number" class="emby-input" id="txtAddUserPolicyDelay" min="0" max="3600" step="1" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;" />
                         </div>
                         <div>
                             <button is="emby-button" type="button" id="btnAddUserPolicy" class="raised" style="margin: 0; height: 36px; min-width: 84px;">
-                                <span>添加</span>
+                                <span data-i18n="userPolicy.add">添加</span>
                             </button>
                         </div>
                     </div>
 
-                    <div class="fieldDescription" style="margin-top: 0.6em;">
+                    <div class="fieldDescription" style="margin-top: 0.6em;" data-i18n="userPolicy.footerDesc">
                         延迟留空表示沿用全局延迟。保存时「继承全局」的用户不会写入配置文件。
                     </div>
                 </div>
 
                 <div>
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">
-                        <span>保存</span>
+                        <span data-i18n="common.save">保存</span>
                     </button>
                 </div>
             </div>

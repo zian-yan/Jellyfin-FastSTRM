@@ -3,6 +3,318 @@ export default function (view) {
 
     var pluginId = 'a1b2c3d4-5678-9abc-def0-123456789abc';
 
+    // ── i18n ──
+    // 语言跟随 Jellyfin 界面语言：识别到 zh 即中文（Hant / TW / HK / MO 走繁体），其余一律英文。
+    // HTML 上的文案以简中写在标签内做兜底，脚本失效时页面依然可读；此处只做覆盖。
+    var STRINGS = {
+        'summary.total': {
+            zh: '.strm 媒体数量',
+            zhHant: '.strm 媒體數量',
+            en: '.strm items'
+        },
+        'summary.probed': {
+            zh: '已有流信息',
+            zhHant: '已有流資訊',
+            en: 'With stream info'
+        },
+        'summary.unprobed': {
+            zh: '缺少流信息',
+            zhHant: '缺少流資訊',
+            en: 'Missing stream info'
+        },
+        'probe.mode.incremental': {
+            zh: '增量探测',
+            zhHant: '增量探測',
+            en: 'Incremental'
+        },
+        'probe.mode.full': {
+            zh: '全量探测',
+            zhHant: '全量探測',
+            en: 'Full'
+        },
+        'probe.start': {
+            zh: '启动预探测',
+            zhHant: '啟動預探測',
+            en: 'Start pre-probe'
+        },
+        'probe.stop': {
+            zh: '停止',
+            zhHant: '停止',
+            en: 'Stop'
+        },
+        'probe.currentItemLabel': {
+            zh: '正在探测: ',
+            zhHant: '正在探測: ',
+            en: 'Probing: '
+        },
+        'status.prefix': {
+            zh: '执行状态: ',
+            zhHant: '執行狀態: ',
+            en: 'Status: '
+        },
+        'status.state.Idle': {
+            zh: '空闲',
+            zhHant: '閒置',
+            en: 'Idle'
+        },
+        'status.state.Running': {
+            zh: '运行中',
+            zhHant: '執行中',
+            en: 'Running'
+        },
+        'status.state.Stopping': {
+            zh: '停止中',
+            zhHant: '停止中',
+            en: 'Stopping'
+        },
+        'config.concurrency': {
+            zh: '探测并发数',
+            zhHant: '探測併發數',
+            en: 'Probe concurrency'
+        },
+        'config.concurrencyDesc': {
+            zh: '增量探测、全量探测、入库自动探测与补探测统一使用该并发数，默认 1，范围 1–16。',
+            zhHant: '增量探測、全量探測、入庫自動探測與補探測皆使用此併發數，預設 1，範圍 1–16。',
+            en: 'Shared by incremental probing, full probing, auto-probe on import and re-probe. Default 1, range 1-16.'
+        },
+        'config.autoProbe': {
+            zh: 'Strm入库自动探测',
+            zhHant: 'Strm 入庫自動探測',
+            en: 'Auto-probe STRM items on import'
+        },
+        'config.skipUnprobed': {
+            zh: '未探测的 STRM 文件也跳过探测',
+            zhHant: '未探測的 STRM 檔案也跳過探測',
+            en: 'Also skip probing for unprobed STRM files'
+        },
+        'config.skipUnprobedDesc': {
+            zh: '开启：跳过 ffprobe 直接起播；关闭：回退官方探测。',
+            zhHant: '開啟：跳過 ffprobe 直接起播；關閉：回退官方探測。',
+            en: 'On: skip ffprobe and start playback immediately. Off: fall back to official probing.'
+        },
+        'config.afterStartMode': {
+            zh: '起播后策略',
+            zhHant: '起播後策略',
+            en: 'After start'
+        },
+        'config.afterStart.none': {
+            zh: '不补探测（默认）',
+            zhHant: '不補探測（預設）',
+            en: 'No re-probe (default)'
+        },
+        'config.afterStart.background': {
+            zh: '后台补探测',
+            zhHant: '背景補探測',
+            en: 'Re-probe in background'
+        },
+        'config.afterStartDesc': {
+            zh: '仅在开关开启时生效；不补探测不会再次请求流地址。',
+            zhHant: '僅在開關開啟時生效；不補探測不會再次請求串流位址。',
+            en: 'Only applies while the switch above is on. No re-probe means the stream URL is never requested again.'
+        },
+        'config.backgroundDelay': {
+            zh: '补探测延迟（秒）',
+            zhHant: '補探測延遲（秒）',
+            en: 'Re-probe delay (seconds)'
+        },
+        'config.backgroundDelayDesc': {
+            zh: '默认 5 秒，范围 0–3600。',
+            zhHant: '預設 5 秒，範圍 0–3600。',
+            en: 'Default 5 seconds, range 0-3600.'
+        },
+        'config.cancelOnStop': {
+            zh: '播放停止后取消补探测',
+            zhHant: '播放停止後取消補探測',
+            en: 'Cancel re-probe when playback stops'
+        },
+        'config.cancelOnStopDesc': {
+            zh: '默认开启；关闭后播放停止仍会继续补探测。',
+            zhHant: '預設開啟；關閉後播放停止仍會繼續補探測。',
+            en: 'On by default. When off, the re-probe continues after playback stops.'
+        },
+        'userPolicy.title': {
+            zh: '按用户播放策略',
+            zhHant: '依使用者播放策略',
+            en: 'Per-user playback policy'
+        },
+        'userPolicy.desc': {
+            zh: '用户级配置优先于上方全局配置；未在此列出的用户继承全局策略。策略在每次播放请求时读取，保存后对下一次播放生效，不影响正在播放的会话。',
+            zhHant: '使用者層級設定優先於上方全域設定；未在此列出的使用者沿用全域策略。策略在每次播放請求時讀取，儲存後對下一次播放生效，不影響正在播放的工作階段。',
+            en: 'Per-user settings override the global settings above; users not listed here inherit the global policy. The policy is read on every playback request, so a save takes effect from the next playback and does not affect sessions already playing.'
+        },
+        'userPolicy.empty': {
+            zh: '暂无用户级配置，所有用户继承全局策略。',
+            zhHant: '尚無使用者層級設定，所有使用者皆沿用全域策略。',
+            en: 'No per-user settings yet. All users inherit the global policy.'
+        },
+        'userPolicy.user': {
+            zh: '用户',
+            zhHant: '使用者',
+            en: 'User'
+        },
+        'userPolicy.mode': {
+            zh: '播放策略',
+            zhHant: '播放策略',
+            en: 'Playback policy'
+        },
+        'userPolicy.add': {
+            zh: '添加',
+            zhHant: '新增',
+            en: 'Add'
+        },
+        'userPolicy.footerDesc': {
+            zh: '延迟留空表示沿用全局延迟。保存时「继承全局」的用户不会写入配置文件。',
+            zhHant: '延遲留空表示沿用全域延遲。儲存時「沿用全域」的使用者不會寫入設定檔。',
+            en: 'Leave the delay empty to use the global delay. Users set to “inherit global” are not written to the configuration file.'
+        },
+        'userPolicy.deletedUser': {
+            zh: '已删除的用户 ({0})',
+            zhHant: '已刪除的使用者 ({0})',
+            en: 'Deleted user ({0})'
+        },
+        'userPolicy.summary': {
+            zh: '已配置 {0} 个用户，{1} 个用户继承全局',
+            zhHant: '已設定 {0} 位使用者，{1} 位沿用全域',
+            en: '{0} configured, {1} inheriting the global policy'
+        },
+        'userPolicy.inheritGlobal': {
+            zh: '继承全局 ({0}s)',
+            zhHant: '沿用全域 ({0}s)',
+            en: 'Inherit global ({0}s)'
+        },
+        'userPolicy.remove': {
+            zh: '移除',
+            zhHant: '移除',
+            en: 'Remove'
+        },
+        'userPolicy.allConfigured': {
+            zh: '所有用户均已配置',
+            zhHant: '所有使用者皆已設定',
+            en: 'All users are already configured'
+        },
+        'userPolicy.noUsers': {
+            zh: '无可用用户',
+            zhHant: '無可用使用者',
+            en: 'No users available'
+        },
+        'userPolicy.usersLoadFailed': {
+            zh: '无法读取用户列表，现有用户策略保持不变',
+            zhHant: '無法讀取使用者清單，現有使用者策略維持不變',
+            en: 'Unable to load the user list. Existing per-user policies are unchanged.'
+        },
+        'policyMode.Inherit': {
+            zh: '继承全局',
+            zhHant: '沿用全域',
+            en: 'Inherit global'
+        },
+        'policyMode.InstantNoProbe': {
+            zh: '跳过探测 · 不补探测',
+            zhHant: '跳過探測 · 不補探測',
+            en: 'Skip probe · no re-probe'
+        },
+        'policyMode.InstantBackgroundProbe': {
+            zh: '跳过探测 · 后台补探测',
+            zhHant: '跳過探測 · 背景補探測',
+            en: 'Skip probe · re-probe in background'
+        },
+        'policyMode.OfficialProbe': {
+            zh: '不跳过探测（官方 ffprobe）',
+            zhHant: '不跳過探測（官方 ffprobe）',
+            en: 'Do not skip probe (official ffprobe)'
+        },
+        'common.save': {
+            zh: '保存',
+            zhHant: '儲存',
+            en: 'Save'
+        }
+    };
+
+    var LANG_HANS = 'zh';
+    var LANG_HANT = 'zhHant';
+    var LANG_EN = 'en';
+
+    // 界面语言来自 Jellyfin Web：优先 <html lang>（appHost.setCulture 会写入），
+    // 其次 Globalize 当前区域，两者都拿不到才退回浏览器语言。任一信号为中文即判定中文。
+    function detectLanguage() {
+        var signals = [];
+
+        var docLang = document.documentElement.getAttribute('lang');
+        if (docLang) {
+            signals.push(docLang);
+        }
+
+        try {
+            if (window.Globalize && window.Globalize.culture) {
+                var cultureName = window.Globalize.culture().name;
+                if (cultureName) {
+                    signals.push(cultureName);
+                }
+            }
+        } catch (e) {
+            // Globalize 可能不存在或未初始化，忽略该信号。
+        }
+
+        if (!signals.length) {
+            try {
+                if (navigator.language) {
+                    signals.push(navigator.language);
+                }
+            } catch (e2) {
+                // 极少数环境禁用 navigator，保持空信号 → 回落英文。
+            }
+        }
+
+        var matched = null;
+        for (var i = 0; i < signals.length; i++) {
+            var code = String(signals[i]).toLowerCase().replace(/_/g, '-');
+            if (code.indexOf('zh') !== 0 && code.indexOf('chinese') === -1) {
+                continue;
+            }
+
+            var isHant = code.indexOf('hant') !== -1
+                || code.indexOf('-tw') !== -1
+                || code.indexOf('-hk') !== -1
+                || code.indexOf('-mo') !== -1;
+            if (isHant) {
+                return LANG_HANT;
+            }
+            matched = LANG_HANS;
+        }
+
+        return matched || LANG_EN;
+    }
+
+    var currentLanguage = detectLanguage();
+
+    function t(key) {
+        var entry = STRINGS[key];
+        var text = entry ? (entry[currentLanguage] || entry.zh) : null;
+        if (text === null || text === undefined) {
+            // 缺词条时退回 key 本身，便于发现漏翻。
+            text = key;
+        }
+
+        for (var i = 1; i < arguments.length; i++) {
+            text = text.replace('{' + (i - 1) + '}', arguments[i]);
+        }
+        return text;
+    }
+
+    // 覆盖所有带 data-i18n 标记的节点；未覆盖的属性（placeholder/title）由各渲染函数用 t() 设置。
+    function applyTranslations() {
+        var nodes = view.querySelectorAll('[data-i18n]');
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            var entry = STRINGS[node.getAttribute('data-i18n')];
+            if (!entry) {
+                continue;
+            }
+            node.textContent = entry[currentLanguage] || entry.zh;
+        }
+    }
+
+    applyTranslations();
+
     // ── DOM references ──
     var lblTotal = view.querySelector('#lblSummaryTotal');
     var lblProbed = view.querySelector('#lblSummaryProbed');
@@ -10,7 +322,7 @@ export default function (view) {
     var selectMode = view.querySelector('#selectProbeMode');
     var btnStart = view.querySelector('#btnStartProbe');
     var btnStop = view.querySelector('#btnStopProbe');
-    var lblStatus = view.querySelector('#lblTaskStatus');
+    var lblTaskState = view.querySelector('#lblTaskState');
     var progressBar = view.querySelector('#probeProgressBar');
     var lblCurrentItem = view.querySelector('#lblCurrentItem');
     var chkAutoProbe = view.querySelector('#chkEnableAutoProbe');
@@ -40,14 +352,13 @@ export default function (view) {
     var users = [];
     var globalDelaySeconds = 5;
 
-    var policyModeLabels = {
-        Inherit: '继承全局',
-        InstantNoProbe: '跳过探测 · 不补探测',
-        InstantBackgroundProbe: '跳过探测 · 后台补探测',
-        OfficialProbe: '不跳过探测（官方 ffprobe）'
-    };
-
     var policyModeOrder = ['Inherit', 'InstantNoProbe', 'InstantBackgroundProbe', 'OfficialProbe'];
+
+    // key 集合固定，值随语言变化；同时用作「模式是否合法」的判定表。
+    var policyModeLabels = {};
+    policyModeOrder.forEach(function (mode) {
+        policyModeLabels[mode] = t('policyMode.' + mode);
+    });
 
     // ── Helpers ──
 
@@ -103,7 +414,7 @@ export default function (view) {
 
         // 用户列表还没加载完时只显示 Id 前缀，加载完会重新渲染出名字。
         return users.length
-            ? '已删除的用户 (' + String(userId).substring(0, 8) + ')'
+            ? t('userPolicy.deletedUser', String(userId).substring(0, 8))
             : String(userId).substring(0, 8);
     }
 
@@ -116,7 +427,7 @@ export default function (view) {
         }
 
         var inherited = Math.max(0, users.length - configured);
-        lblUserPolicySummary.textContent = '已配置 ' + configured + ' 个用户，' + inherited + ' 个用户继承全局';
+        lblUserPolicySummary.textContent = t('userPolicy.summary', configured, inherited);
     }
 
     function syncRowState(policy, modeSelect, delayInput) {
@@ -159,7 +470,7 @@ export default function (view) {
         delayInput.step = '1';
         delayInput.className = 'emby-input';
         delayInput.style.cssText = 'width: 100%; height: 36px; box-sizing: border-box; margin: 0;';
-        delayInput.placeholder = '继承全局 (' + globalDelaySeconds + 's)';
+        delayInput.placeholder = t('userPolicy.inheritGlobal', globalDelaySeconds);
         delayInput.value = policy.BackgroundProbeDelaySeconds === null
             || policy.BackgroundProbeDelaySeconds === undefined
             ? ''
@@ -169,7 +480,7 @@ export default function (view) {
         removeBtn.type = 'button';
         removeBtn.className = 'raised';
         removeBtn.style.cssText = 'margin: 0; height: 36px; min-width: 72px;';
-        removeBtn.textContent = '移除';
+        removeBtn.textContent = t('userPolicy.remove');
 
         modeSelect.addEventListener('change', function () {
             policy.Mode = modeSelect.value;
@@ -220,7 +531,7 @@ export default function (view) {
         if (!available.length) {
             var placeholder = document.createElement('option');
             placeholder.value = '';
-            placeholder.textContent = users.length ? '所有用户均已配置' : '无可用用户';
+            placeholder.textContent = users.length ? t('userPolicy.allConfigured') : t('userPolicy.noUsers');
             selectAddUser.appendChild(placeholder);
             selectAddUser.disabled = true;
             btnAddUserPolicy.disabled = true;
@@ -311,7 +622,7 @@ export default function (view) {
             renderUserPolicies();
         }).catch(function () {
             // 用户列表拿不到时不能阻断全局配置的保存：既有策略仍在 userPolicies 里，原样回写。
-            lblUserPolicySummary.textContent = '无法读取用户列表，现有用户策略保持不变';
+            lblUserPolicySummary.textContent = t('userPolicy.usersLoadFailed');
             btnAddUserPolicy.disabled = true;
             selectAddUser.disabled = true;
         });
@@ -332,8 +643,9 @@ export default function (view) {
 
     function loadStatus() {
         return apiGet('FastStrm/Probe/Status').then(function (data) {
-            var stateMap = { Idle: '空闲', Running: '运行中', Stopping: '停止中' };
-            lblStatus.textContent = '执行状态: ' + (stateMap[data.State] || data.State);
+            // 服务端未来新增的状态值不会命中词条，原样显示比显示 key 更有用。
+            var stateText = STRINGS['status.state.' + data.State] ? t('status.state.' + data.State) : data.State;
+            lblTaskState.textContent = stateText;
             lblCurrentItem.textContent = data.CurrentItem || '-';
 
             var pct = data.Total > 0 ? Math.round((data.Processed / data.Total) * 100) : 0;
@@ -452,7 +764,7 @@ export default function (view) {
         var background = selectAddMode.value === 'InstantBackgroundProbe';
         txtAddDelay.disabled = !background;
         txtAddDelay.style.opacity = background ? '1' : '0.45';
-        txtAddDelay.placeholder = '继承全局 (' + globalDelaySeconds + 's)';
+        txtAddDelay.placeholder = t('userPolicy.inheritGlobal', globalDelaySeconds);
         if (!background) {
             txtAddDelay.value = '';
         }
@@ -492,6 +804,8 @@ export default function (view) {
 
     view.addEventListener('viewshow', function () {
         visible = true;
+        // 页面可能被缓存复用：语言若在外部被改过，重新套用文字（幂等）。
+        applyTranslations();
         loadSummary();
         loadStatus().catch(function () {
             // Transient failure while opening the page; the next status poll/visit retries.
