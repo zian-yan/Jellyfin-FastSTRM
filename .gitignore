@@ -16,3 +16,7 @@ Thumbs.db
 
 # Local tooling / assistant workspace data
 .workbuddy/
+
+# Python
+__pycache__/
+*.pyc
