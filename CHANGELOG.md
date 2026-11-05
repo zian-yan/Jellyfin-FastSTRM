@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### 📖 文档
+
+- README 拆分为英文（`README.md`，默认展示）与中文（`README.zh-CN.md`）两个版本，顶部语言切换可互相跳转。
+
+---
+
 ## [3.4.1] - 2026-11-04
 
 ### 🐛 修复
