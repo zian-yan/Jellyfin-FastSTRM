@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/zian-yan/jellyfin-plugin-faststrm/main/images/faststrm-banner.png",
     "versions": [
       {
+        "version": "3.4.2.0",
+        "changelog": "### ✨ 新增\n\n- 配置页支持多语言：文案跟随 Jellyfin 界面语言自动切换中文（简体 / 繁体）与英文，非中文环境一律显示英文；语言取 `<html lang>` 与当前区域设置，无需手动选择。\n\n### 🐛 修复\n\n- 修复配置页下拉框与输入框内文字被垂直裁掉约四分之一的问题（如「增量探测」「继承全局 (5s)」显示不全）：控件不再写死 `height`，改为 `min-height` + 主题 padding 自适应撑高，换主题或调大字号都不会再裁字。\n\n### 📖 文档\n\n- README 拆分为英文（`README.md`，默认展示）与中文（`README.zh-CN.md`）两个版本，顶部语言切换可互相跳转。\n\n---",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/zian-yan/jellyfin-plugin-faststrm/releases/download/v3.4.2/FastSTRM.zip",
+        "checksum": "c9678eade3247149e2cd203d11238149",
+        "timestamp": "2026-11-06T12:49:16Z"
+      },
+      {
         "version": "3.4.1.0",
         "changelog": "### 🐛 修复\n\n- 修复「用户级设为『不补探测』、全局开着『后台补探测』时，播放停止后仍会发起补探测」的问题：播放进度上报改为复用取源时记录的策略，不再重新解析后落到全局策略。\n- 播放停止后补发的那次进度上报只保存进度，不再调度新的补探测（此前会出现「已经停止播放，后台还在下载探流」）。\n\n---",
         "targetAbi": "12.0.0.0",
