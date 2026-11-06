@@ -9,9 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [3.4.2] - 2026-11-06
+
 ### ✨ 新增
 
 - 配置页支持多语言：文案跟随 Jellyfin 界面语言自动切换中文（简体 / 繁体）与英文，非中文环境一律显示英文；语言取 `<html lang>` 与当前区域设置，无需手动选择。
+
+### 🐛 修复
+
+- 修复配置页下拉框与输入框内文字被垂直裁掉约四分之一的问题（如「增量探测」「继承全局 (5s)」显示不全）：控件不再写死 `height`，改为 `min-height` + 主题 padding 自适应撑高，换主题或调大字号都不会再裁字。
 
 ### 📖 文档
 
