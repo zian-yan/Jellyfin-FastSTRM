@@ -1,4 +1,26 @@
 <div id="FastStrmConfigurationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/FastSTRM.js">
+    <!-- 控件高度不写死：Jellyfin 主题本身用 padding 撑高，硬设 height 会把文字裁掉 -->
+    <style>
+        #FastStrmConfigurationPage .fsrm-control {
+            box-sizing: border-box;
+            width: 100%;
+            height: auto;
+            min-height: 38px;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        #FastStrmConfigurationPage .fsrm-control-sm {
+            min-height: 36px;
+        }
+
+        /* 输入框与下拉框内部文本不换行、不裁切 */
+        #FastStrmConfigurationPage .fsrm-control.emby-input,
+        #FastStrmConfigurationPage .fsrm-control.emby-select {
+            overflow: visible;
+            text-overflow: ellipsis;
+        }
+    </style>
     <div class="content-primary" style="max-width: 800px;">
         
         <!-- 页面标题 -->
@@ -31,16 +53,16 @@
                 <!-- 模式选择与按钮 -->
                 <div class="flex align-items-center" style="gap: 0.8em; margin-top: 1.2em; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 180px;">
-                        <select is="emby-select" id="selectProbeMode" class="emby-select" style="margin: 0; width: 100%; height: 38px; box-sizing: border-box;">
+                        <select is="emby-select" id="selectProbeMode" class="emby-select fsrm-control" style="margin: 0;">
                             <option value="Incremental" data-i18n="probe.mode.incremental">增量探测</option>
                             <option value="Full" data-i18n="probe.mode.full">全量探测</option>
                         </select>
                     </div>
                     <div>
-                        <button is="emby-button" type="button" id="btnStartProbe" class="raised button-submit" style="margin: 0; min-width: 120px; height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;">
+                        <button is="emby-button" type="button" id="btnStartProbe" class="raised button-submit" style="margin: 0; min-width: 120px; min-height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;">
                             <span data-i18n="probe.start">启动预探测</span>
                         </button>
-                        <button is="emby-button" type="button" id="btnStopProbe" class="raised" style="margin: 0; min-width: 120px; height: 38px; box-sizing: border-box; display: none; background: #b71c1c; color: white; align-items: center; justify-content: center;">
+                        <button is="emby-button" type="button" id="btnStopProbe" class="raised" style="margin: 0; min-width: 120px; min-height: 38px; box-sizing: border-box; display: none; background: #b71c1c; color: white; align-items: center; justify-content: center;">
                             <span data-i18n="probe.stop">停止</span>
                         </button>
                     </div>
@@ -144,11 +166,11 @@
                     <div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 0.9fr) auto; gap: 0.6em; align-items: end; margin-top: 1.1em; padding-top: 1em; border-top: 1px dashed rgba(255, 255, 255, 0.1);">
                         <div style="min-width: 0;">
                             <label class="inputLabel inputLabelUnfocused" for="selectAddUserPolicyUser" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;" data-i18n="userPolicy.user">用户</label>
-                            <select class="emby-select" id="selectAddUserPolicyUser" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;"></select>
+                            <select class="emby-select fsrm-control fsrm-control-sm" id="selectAddUserPolicyUser" style="margin: 0;"></select>
                         </div>
                         <div style="min-width: 0;">
                             <label class="inputLabel inputLabelUnfocused" for="selectAddUserPolicyMode" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;" data-i18n="userPolicy.mode">播放策略</label>
-                            <select class="emby-select" id="selectAddUserPolicyMode" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;">
+                            <select class="emby-select fsrm-control fsrm-control-sm" id="selectAddUserPolicyMode" style="margin: 0;">
                                 <option value="InstantNoProbe" data-i18n="policyMode.InstantNoProbe">跳过探测 · 不补探测</option>
                                 <option value="InstantBackgroundProbe" data-i18n="policyMode.InstantBackgroundProbe">跳过探测 · 后台补探测</option>
                                 <option value="OfficialProbe" data-i18n="policyMode.OfficialProbe">不跳过探测（官方 ffprobe）</option>
@@ -156,10 +178,10 @@
                         </div>
                         <div style="min-width: 0;">
                             <label class="inputLabel inputLabelUnfocused" for="txtAddUserPolicyDelay" style="display: block; font-size: 0.8em; color: #888; margin-bottom: 0.3em;" data-i18n="config.backgroundDelay">补探测延迟（秒）</label>
-                            <input type="number" class="emby-input" id="txtAddUserPolicyDelay" min="0" max="3600" step="1" style="width: 100%; height: 36px; box-sizing: border-box; margin: 0;" />
+                            <input type="number" class="emby-input fsrm-control fsrm-control-sm" id="txtAddUserPolicyDelay" min="0" max="3600" step="1" style="margin: 0;" />
                         </div>
                         <div>
-                            <button is="emby-button" type="button" id="btnAddUserPolicy" class="raised" style="margin: 0; height: 36px; min-width: 84px;">
+                            <button is="emby-button" type="button" id="btnAddUserPolicy" class="raised" style="margin: 0; min-height: 36px; min-width: 84px;">
                                 <span data-i18n="userPolicy.add">添加</span>
                             </button>
                         </div>

@@ -453,8 +453,8 @@ export default function (view) {
         nameCell.style.cssText = 'font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
 
         var modeSelect = document.createElement('select');
-        modeSelect.className = 'emby-select';
-        modeSelect.style.cssText = 'width: 100%; height: 36px; box-sizing: border-box; margin: 0;';
+        modeSelect.className = 'emby-select fsrm-control fsrm-control-sm';
+        modeSelect.style.cssText = 'margin: 0;';
         policyModeOrder.forEach(function (mode) {
             var option = document.createElement('option');
             option.value = mode;
@@ -468,8 +468,8 @@ export default function (view) {
         delayInput.min = '0';
         delayInput.max = '3600';
         delayInput.step = '1';
-        delayInput.className = 'emby-input';
-        delayInput.style.cssText = 'width: 100%; height: 36px; box-sizing: border-box; margin: 0;';
+        delayInput.className = 'emby-input fsrm-control fsrm-control-sm';
+        delayInput.style.cssText = 'margin: 0;';
         delayInput.placeholder = t('userPolicy.inheritGlobal', globalDelaySeconds);
         delayInput.value = policy.BackgroundProbeDelaySeconds === null
             || policy.BackgroundProbeDelaySeconds === undefined
@@ -479,7 +479,7 @@ export default function (view) {
         var removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'raised';
-        removeBtn.style.cssText = 'margin: 0; height: 36px; min-width: 72px;';
+        removeBtn.style.cssText = 'margin: 0; min-height: 36px; min-width: 72px;';
         removeBtn.textContent = t('userPolicy.remove');
 
         modeSelect.addEventListener('change', function () {
