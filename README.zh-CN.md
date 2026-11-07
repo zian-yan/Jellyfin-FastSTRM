@@ -36,14 +36,20 @@ FastSTRM 以装饰器方式包裹 Jellyfin 的 `IMediaSourceManager` 与 `IUserD
 源码按模块分目录，**目录名与命名空间一一对应**（`Playback/` → `FastSTRM.Playback`）：
 
 ```
-FastSTRM.csproj
-├── Plugin.cs                     插件入口（BasePlugin + 配置页注册），命名空间 FastSTRM
-├── PluginServiceRegistrator.cs   DI 组合根：装饰器与服务注册
-├── Api/                          管理接口（/FastStrm/*）
-├── Configuration/                配置契约（XML 持久化）与配置页静态资源
-├── Playback/                     播放链路：策略解析 + 两个装饰器
-├── Probing/                      后台探测服务（全库预探测 / 入库探测 / 起播补探测）
-└── Common/                       跨模块共享工具（日志脱敏）
+jellyfin-plugin-faststrm/
+├── Jellyfin.Plugin.FastSTRM.sln          解决方案（插件 + 测试）
+├── Jellyfin.Plugin.FastSTRM/
+│   ├── Jellyfin.Plugin.FastSTRM.csproj   插件项目（程序集名仍为 `FastSTRM`）
+│   ├── Plugin.cs                     插件入口（BasePlugin + 配置页注册），命名空间 FastSTRM
+│   ├── PluginServiceRegistrator.cs   DI 组合根：装饰器与服务注册
+│   ├── Api/                          管理接口（/FastStrm/*）
+│   ├── Configuration/                配置契约（XML 持久化）与配置页静态资源
+│   ├── Playback/                     播放链路：策略解析 + 两个装饰器
+│   ├── Probing/                      后台探测服务（全库预探测 / 入库探测 / 起播补探测）
+│   └── Common/                       跨模块共享工具（日志脱敏）
+├── Jellyfin.Plugin.FastSTRM.Test/        xUnit 测试（GUID / 版本一致性守卫）
+├── build.yaml · meta.json · manifest.json
+└── images/ · scripts/ · wiki/
 ```
 
 > 配置页 `configPage.html` / `configPage.js` 以**嵌入资源**打包，资源名由「根命名空间 + 目录路径」决定。
@@ -144,10 +150,10 @@ PlaybackInfo 请求
 ```bash
 git clone https://github.com/zian-yan/jellyfin-plugin-faststrm.git
 cd jellyfin-plugin-faststrm
-dotnet build -c Release
+dotnet build Jellyfin.Plugin.FastSTRM/Jellyfin.Plugin.FastSTRM.csproj -c Release
 ```
 
-将 `bin/Release/net10.0/FastSTRM.dll` 复制到上述插件目录。
+将 `Jellyfin.Plugin.FastSTRM/bin/Release/net10.0/FastSTRM.dll` 复制到上述插件目录。
 
 ---
 

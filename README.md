@@ -36,14 +36,20 @@ The plugin also ships a background `ProbeService` that turns "without stream inf
 Source is organized by module, and **directory names map 1:1 to namespaces** (`Playback/` → `FastSTRM.Playback`):
 
 ```
-FastSTRM.csproj
-├── Plugin.cs                     Plugin entry point (BasePlugin + config page registration), namespace FastSTRM
-├── PluginServiceRegistrator.cs   DI composition root: decorators and service registration
-├── Api/                          Admin endpoints (/FastStrm/*)
-├── Configuration/                Configuration contract (XML persistence) and config page assets
-├── Playback/                     Playback path: policy resolution + the two decorators
-├── Probing/                      Background probe service (pre-probe / probe on add / post-start probe)
-└── Common/                       Cross-module utilities (log redaction)
+jellyfin-plugin-faststrm/
+├── Jellyfin.Plugin.FastSTRM.sln          Solution (plugin project + test project)
+├── Jellyfin.Plugin.FastSTRM/
+│   ├── Jellyfin.Plugin.FastSTRM.csproj   Plugin project (assembly name stays `FastSTRM`)
+│   ├── Plugin.cs                     Plugin entry point (BasePlugin + config page registration), namespace FastSTRM
+│   ├── PluginServiceRegistrator.cs   DI composition root: decorators and service registration
+│   ├── Api/                          Admin endpoints (/FastStrm/*)
+│   ├── Configuration/                Configuration contract (XML persistence) and config page assets
+│   ├── Playback/                     Playback path: policy resolution + the two decorators
+│   ├── Probing/                      Background probe service (pre-probe / probe on add / post-start probe)
+│   └── Common/                       Cross-module utilities (log redaction)
+├── Jellyfin.Plugin.FastSTRM.Test/        xUnit tests (GUID / version consistency guards)
+├── build.yaml · meta.json · manifest.json
+└── images/ · scripts/ · wiki/
 ```
 
 > The config page `configPage.html` / `configPage.js` are packaged as **embedded resources**; the resource name is derived from "root namespace + directory path".
@@ -145,10 +151,10 @@ Details, fallback matrix and API examples: see the Wiki —
 ```bash
 git clone https://github.com/zian-yan/jellyfin-plugin-faststrm.git
 cd jellyfin-plugin-faststrm
-dotnet build -c Release
+dotnet build Jellyfin.Plugin.FastSTRM/Jellyfin.Plugin.FastSTRM.csproj -c Release
 ```
 
-Copy `bin/Release/net10.0/FastSTRM.dll` into the plugin directory above.
+Copy `Jellyfin.Plugin.FastSTRM/bin/Release/net10.0/FastSTRM.dll` into the plugin directory above.
 
 ---
 

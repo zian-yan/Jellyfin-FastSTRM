@@ -53,14 +53,14 @@ jobs:
           echo "tag=v${TAG_NAME}" >> "$GITHUB_OUTPUT"
           echo "clean=${CLEAN_VER}" >> "$GITHUB_OUTPUT"
 
-          CSPROJ_VER=$(grep -oP '(?<=<Version>)[^<]+' FastSTRM.csproj | head -n1)
+          CSPROJ_VER=$(grep -oP '(?<=<Version>)[^<]+' Jellyfin.Plugin.FastSTRM/Jellyfin.Plugin.FastSTRM.csproj | head -n1)
           META_VER=$(grep -oP '(?<="version": ")[^"]+' meta.json | head -n1)
           BUILD_VER=$(grep -oP '(?<=^version: ")[^"]+' build.yaml | head -n1)
 
           echo "tag=${TAG_NAME} clean=${CLEAN_VER} csproj=${CSPROJ_VER} meta=${META_VER} build=${BUILD_VER}"
           echo "normalized: csproj=$(normalize "${CSPROJ_VER}") meta=$(normalize "${META_VER}") build=$(normalize "${BUILD_VER}")"
 
-          for pair in "FastSTRM.csproj:${CSPROJ_VER}" "meta.json:${META_VER}" "build.yaml:${BUILD_VER}"; do
+          for pair in "Jellyfin.Plugin.FastSTRM.csproj:${CSPROJ_VER}" "meta.json:${META_VER}" "build.yaml:${BUILD_VER}"; do
             file="${pair%%:*}"
             value="${pair#*:}"
             norm_val=$(normalize "$value")
@@ -70,23 +70,28 @@ jobs:
             fi
           done
 
+      - name: Run Tests
+        run: dotnet test Jellyfin.Plugin.FastSTRM.Test/Jellyfin.Plugin.FastSTRM.Test.csproj -c Release --nologo
+
       - name: Build Release DLL
-        run: dotnet build FastSTRM.csproj -c Release --nologo
+        run: dotnet build Jellyfin.Plugin.FastSTRM/Jellyfin.Plugin.FastSTRM.csproj -c Release --nologo
 
       - name: Prepare Release Assets
         run: |
           set -e
 
-          if [ ! -f bin/Release/net10.0/FastSTRM.dll ]; then
-            echo "::error::构建产物 bin/Release/net10.0/FastSTRM.dll 不存在"
+          PLUGIN_BIN="Jellyfin.Plugin.FastSTRM/bin/Release/net10.0"
+
+          if [ ! -f "${PLUGIN_BIN}/FastSTRM.dll" ]; then
+            echo "::error::构建产物 ${PLUGIN_BIN}/FastSTRM.dll 不存在"
             exit 1
           fi
 
           mkdir -p release-pkg
-          cp bin/Release/net10.0/FastSTRM.dll release-pkg/
+          cp "${PLUGIN_BIN}/FastSTRM.dll" release-pkg/
           cp README.md CHANGELOG.md meta.json build.yaml release-pkg/
           zip -j FastSTRM.zip release-pkg/*
-          cp bin/Release/net10.0/FastSTRM.dll ./FastSTRM.dll
+          cp "${PLUGIN_BIN}/FastSTRM.dll" ./FastSTRM.dll
 
           ls -lh FastSTRM.dll FastSTRM.zip
 
